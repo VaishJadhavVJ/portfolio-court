@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+/* Custom Utilities for Pixel Art & Retro Vibes */
+@layer utilities {
+  .pixel-corners {
+    clip-path: polygon(
+      0px 4px, 4px 4px, 4px 0px, 
+      calc(100% - 4px) 0px, calc(100% - 4px) 4px, 100% 4px, 
+      100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 
+      4px 100%, 4px calc(100% - 4px), 0px calc(100% - 4px)
+    );
+  }
+}
+
+/* The Defaults */
+body {
+  color: black;
+  background: white;
+  font-family: var(--font-geist-sans), Arial, sans-serif; /* Force the font here */
+}
