@@ -1,40 +1,77 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import AgentSprite from "./AgentSprite";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { DialogueLine } from "@/types/court";
 
-// --- MOCK SCRIPT (The First Test Case) ---
-const TEST_SCRIPT: DialogueLine[] = [
-  { id: 1, speaker: 'ice', emotion: 'neutral', text: "System initialization complete. Welcome to the Kernel." },
-  { id: 2, speaker: 'baka', emotion: 'point', text: "OBJECTION! This isn't a kernel, it's just a div!" },
-  { id: 3, speaker: 'ice', emotion: 'angry', text: "Do not interrupt the boot sequence, you chaotic variable." },
-  { id: 4, speaker: 'child', emotion: 'confused', text: "Umm... are we in the Matrix?" },
-  { id: 5, speaker: 'baka', emotion: 'happy', text: "Who cares? Look at these crisp pixels! 16-bit baby!" },
-];
-
 export default function GameStage() {
+  const [script, setScript] = useState<DialogueLine[]>([]);
   const [index, setIndex] = useState(0);
-  const currentLine = TEST_SCRIPT[index];
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDebate = async () => {
+      try {
+        const res = await fetch('/api/council/debate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: 'portfolio review' })
+        });
+        const data = await res.json();
+        if (data.transcript) {
+          setScript(data.transcript);
+        } else {
+          setError('Failed to load debate.');
+        }
+      } catch (err) {
+        setError('Error fetching debate.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDebate();
+  }, []);
+
+  const currentLine = script[index] || null;
 
   // The custom hook handles the typing effect
-  const { displayedText, isComplete } = useTypewriter(currentLine.text, 30);
+  const { displayedText, isComplete } = useTypewriter(currentLine?.text || "", 30);
 
   const handleNext = () => {
-    if (!isComplete) {
-      // Feature: Click to skip typing (finish immediately)
-      // We can implement this later, for now let's just wait
+    if (!isComplete || !currentLine) {
       return; 
     }
     
-    if (index < TEST_SCRIPT.length - 1) {
+    if (index < script.length - 1) {
       setIndex(index + 1);
     } else {
       // Loop back to start for testing
       setIndex(0);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="relative min-h-screen bg-[#202020] text-white font-mono flex items-center justify-center">
+        <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
+        <p className="animate-pulse text-green-400">CONNECTING TO COUNCIL...</p>
+      </div>
+    );
+  }
+
+  if (error || !currentLine) {
+    return (
+      <div className="relative min-h-screen bg-[#202020] text-white font-mono flex items-center justify-center">
+        <p className="text-red-500">{error || "No dialogue available."}</p>
+        <Link href="/" className="ml-4 px-4 py-2 bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners">
+          [ ESCAPE ]
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-[#202020] text-white font-mono overflow-hidden flex flex-col items-center justify-between">
@@ -71,7 +108,7 @@ export default function GameStage() {
           </div>
 
           {/* Typewriter Text */}
-          <p className="text-xl md:text-2xl leading-relaxed tracking-wide text-gray 100 text-center min-h-[4rem] flex items-center justify-center">
+          <p className="text-xl md:text-2xl leading-relaxed tracking-wide text-gray-100 text-center min-h-[4rem] flex items-center justify-center">
             {displayedText}
             {!isComplete && <span className="animate-pulse">_</span>}
           </p>
