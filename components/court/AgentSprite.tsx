@@ -25,7 +25,7 @@ const SPRITE: Record<AgentName, Partial<Record<Emotion, string>> & { default: st
 export default function AgentSprite({ agent, emotion}: Props){
     const src = `/agents/${agent}-${SPRITE[agent][emotion] ?? SPRITE[agent].default}.png`;
     return(
-        <div className="relative w-[500px] h-[500px] flex items-end justify-center">
+        <div className="relative h-full aspect-[3/4] max-w-[46vw] flex items-end justify-center">
             <AnimatePresence mode="wait">
                 <motion.div
                 key={src} // Triggers animation on change
@@ -39,7 +39,7 @@ export default function AgentSprite({ agent, emotion}: Props){
                 src={src}
                 alt={`${agent} ${emotion}`}
                 fill
-                className="object-contain"
+                className="object-contain object-bottom"
                 style={{ 
                 imageRendering: "pixelated", 
                 filter: "drop-shadow(0 4px 6px rgba(0,0,0,0.5))"

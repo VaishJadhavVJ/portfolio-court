@@ -1,21 +1,40 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import useSound from "use-sound";
 import AgentSprite from "./AgentSprite";
 import { useTypewriter } from "@/hooks/useTypewriter";
-import { DialogueLine } from "@/types/court";
+import { AgentName, DialogueLine } from "@/types/court";
 import debatesDataRaw from "@/data/debates.json";
 
 const debatesData = debatesDataRaw as Record<string, DialogueLine[]>;
 
+/** Which courtroom each speaker argues from. Files live in public/backgrounds/. */
+const BACKGROUNDS: Record<AgentName, string> = {
+  baka: "/backgrounds/court-defense.png",
+  ice: "/backgrounds/court-prosecution.png",
+  child: "/backgrounds/court-judge.png",
+  narrator: "/backgrounds/court-judge.png",
+};
+
+/** Sprite height as a share of the stage, so every character reads the same size. */
+const SPRITE_STAGE_SHARE = "66%";
+
+const linesFor = (topic: string) => (debatesData[topic] ?? []).filter((l) => l.text.trim());
+
 export default function GameStage() {
   const topics = Object.keys(debatesData);
-  const [selectedTopic, setSelectedTopic] = useState<string>(
-    topics.includes("Portfolio Review") ? "Portfolio Review" : topics[0] || ""
-  );
-  const [script, setScript] = useState<DialogueLine[]>([]);
+  const initialTopic = topics.includes("Portfolio Review") ? "Portfolio Review" : topics[0] || "";
+
+  // Initialised straight from the data rather than in an effect. Starting from []
+  // made the server render the red "No dialogue available" panel, which then
+  // swapped on hydration -- that was the flash.
+  const [selectedTopic, setSelectedTopic] = useState<string>(initialTopic);
+  const [script, setScript] = useState<DialogueLine[]>(() => linesFor(initialTopic));
   const [index, setIndex] = useState(0);
+  const [missingBackground, setMissingBackground] = useState<string | null>(null);
 
   // Sound hooks
   const [playObjection] = useSound("/sounds/objection.mp3", { volume: 0.7 });
@@ -28,13 +47,7 @@ export default function GameStage() {
   // Refs for sound triggers
   const prevIndexRef = useRef(-1);
   const blipCounterRef = useRef(0);
-
-  useEffect(() => {
-    if (selectedTopic && debatesData[selectedTopic]) {
-      setScript(debatesData[selectedTopic].filter(l => l.text.trim()));
-      setIndex(0);
-    }
-  }, [selectedTopic]);
+  const textBoxRef = useRef<HTMLDivElement>(null);
 
   const currentLine = script[index] || null;
 
@@ -85,11 +98,25 @@ export default function GameStage() {
     }
   }, [displayedText, currentLine, isComplete, playTextBlip]);
 
+  // The box height is fixed, so a long line has to scroll. Keep the newest text
+  // in view as it types instead of letting it run off the bottom.
+  useEffect(() => {
+    const el = textBoxRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [displayedText]);
+
+  const handleTopicChange = (topic: string) => {
+    setSelectedTopic(topic);
+    setScript(linesFor(topic));
+    setIndex(0);
+    prevIndexRef.current = -1;
+  };
+
   const handleNext = () => {
     if (!isComplete || !currentLine) {
-      return; 
+      return;
     }
-    
+
     if (index < script.length - 1) {
       setIndex(index + 1);
     } else {
@@ -109,22 +136,35 @@ export default function GameStage() {
     );
   }
 
+  const background = BACKGROUNDS[currentLine.speaker];
+
   return (
-    <div className="relative min-h-screen bg-[#202020] text-white font-mono overflow-hidden flex flex-col items-center justify-between">
-      
+    <div className="relative h-[100dvh] bg-[#202020] text-white font-mono overflow-hidden flex flex-col">
+
       {/* 1. CRT SCANLINE EFFECT (Overlay) */}
       <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
 
+      {/* A missing background is loud, not a silent black stage. */}
+      {missingBackground && (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/95 p-8">
+          <p className="text-red-500 text-sm text-center leading-relaxed">
+            MISSING BACKGROUND: {missingBackground}
+            <br />
+            <span className="text-red-400">Add the file to public/backgrounds/ and reload.</span>
+          </p>
+        </div>
+      )}
+
       {/* 2. TOP BAR (Exit Button & Selector) */}
-      <div className="w-full p-4 flex justify-between items-center z-40">
+      <div className="shrink-0 w-full p-4 flex justify-between items-center z-40">
         <div className="flex items-center gap-4">
           <div className="text-xs text-green-500">SYS.2026.LOGS</div>
-          <select 
-            className="bg-black border-2 border-green-500 text-green-400 text-xs px-2 py-1 outline-none font-mono"
+          <select
+            className="bg-black border-2 border-green-500 text-green-400 text-xs px-2 py-1 outline-none font-mono max-w-[50vw]"
             value={selectedTopic}
-            onChange={(e) => setSelectedTopic(e.target.value)}
+            onChange={(e) => handleTopicChange(e.target.value)}
           >
-            {topics.map(t => (
+            {topics.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
@@ -134,42 +174,76 @@ export default function GameStage() {
         </Link>
       </div>
 
-      {/* 3. THE STAGE (Sprite) */}
-      <div className="flex-1 w-full flex items-end justify-center pb-4 z-10 relative">
-        {/* Floor Line */}
-        <div className="absolute bottom-0 w-full h-1 bg-gray-600"></div>
-        
-        {/* The Actor */}
-        <AgentSprite agent={currentLine.speaker} emotion={currentLine.emotion} />
+      {/* 3. THE STAGE — fills everything above the dialogue box */}
+      <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+
+        {/* Background, cross-faded on speaker change */}
+        <AnimatePresence initial={false}>
+          <motion.div
+            key={background}
+            className="absolute inset-0"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
+          >
+            <Image
+              src={background}
+              alt=""
+              fill
+              sizes="100vw"
+              priority
+              // object-cover crops to fill instead of stretching the aspect ratio.
+              className="object-cover object-center"
+              style={{ imageRendering: "pixelated" }}
+              onError={() => setMissingBackground(background)}
+            />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Grounding shadow so the sprite does not float on the bench */}
+        <div className="absolute inset-x-0 bottom-0 h-1/4 z-10 pointer-events-none bg-gradient-to-t from-black/55 to-transparent" />
+
+        {/*
+          The actor, anchored to the stage floor. Height is a share of the stage
+          and the image is object-contain, so every sprite renders at the same
+          height no matter its source pixels (baka 1034, ice 974, child 1010,
+          narrator 1384) and characters never jump size between lines.
+        */}
+        <div className="absolute inset-x-0 bottom-0 z-20 flex justify-end" style={{ height: SPRITE_STAGE_SHARE }}>
+          <AgentSprite agent={currentLine.speaker} emotion={currentLine.emotion} />
+        </div>
       </div>
 
-      {/* 4. THE DIALOGUE BOX (Retro RPG Style) */}
-      <div className="w-full max-w-3xl p-6 z-40 mb-8">
-        <div 
+      {/* 4. THE DIALOGUE BOX */}
+      <div className="shrink-0 w-[90vw] max-w-[1100px] mx-auto z-40 mb-6">
+        <div
           onClick={handleNext}
-          className="bg-black border-4 border-white p-6 relative min-h-[160px] cursor-pointer hover:border-green-400 transition-colors shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)]"
+          className="bg-black/95 border-4 border-white relative cursor-pointer hover:border-green-400 transition-colors shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)]"
         >
-          {/* Speaker Name Badge */}
-          <div className="absolute -top-5 left-4 bg-blue-600 text-white px-3 py-1 text-sm font-bold uppercase tracking-wider border-2 border-white">
+          {/* Speaker nameplate, flush into the top-left corner of the box */}
+          <div className="absolute top-0 left-0 bg-blue-600 text-white px-3 py-1 text-sm font-bold capitalize tracking-wider border-r-2 border-b-2 border-white z-10">
             {currentLine.speaker}
           </div>
 
-          {/* Typewriter Text */}
-          <p className="text-xl md:text-2xl leading-relaxed tracking-wide text-gray-100 text-center min-h-[4rem] flex items-center justify-center">
-            {displayedText}
-            {!isComplete && <span className="animate-pulse">_</span>}
-          </p>
+          {/* Fixed height: the box must not resize as the typewriter fills it. */}
+          <div ref={textBoxRef} className="h-[170px] overflow-y-auto px-6 pt-11 pb-6">
+            <p className="text-left text-2xl md:text-[1.7rem] leading-relaxed tracking-wide text-gray-100">
+              {displayedText}
+              {!isComplete && <span className="animate-pulse">_</span>}
+            </p>
+          </div>
 
           {/* "Next" Indicator (Blinking Triangle) */}
           {isComplete && (
-            <div className="absolute bottom-4 right-4 text-green-400 animate-bounce text-xl">
+            <div className="absolute bottom-2 right-3 text-green-400 animate-bounce text-xl">
               ▼
             </div>
           )}
         </div>
-        
+
         <div className="text-center mt-2 text-xs text-gray-500">
-          [ CLICK BOX TO CONTINUE ]
+          [ CLICK BOX TO CONTINUE ] &nbsp;·&nbsp; {index + 1}/{script.length}
         </div>
       </div>
 
