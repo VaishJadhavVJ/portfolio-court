@@ -210,7 +210,7 @@ export default function GameStage() {
           height no matter its source pixels (baka 1034, ice 974, child 1010,
           narrator 1384) and characters never jump size between lines.
         */}
-        <div className="absolute inset-x-0 bottom-0 z-20 flex justify-end" style={{ height: SPRITE_STAGE_SHARE }}>
+        <div className="absolute inset-x-0 bottom-0 z-20" style={{ height: SPRITE_STAGE_SHARE }}>
           <AgentSprite agent={currentLine.speaker} emotion={currentLine.emotion} />
         </div>
       </div>

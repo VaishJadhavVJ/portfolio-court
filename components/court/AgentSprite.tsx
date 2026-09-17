@@ -25,7 +25,7 @@ const SPRITE: Record<AgentName, Partial<Record<Emotion, string>> & { default: st
 export default function AgentSprite({ agent, emotion}: Props){
     const src = `/agents/${agent}-${SPRITE[agent][emotion] ?? SPRITE[agent].default}.png`;
     return(
-        <div className="relative h-full aspect-[3/4] max-w-[46vw] flex items-end justify-center">
+        <div className="relative w-full h-full">
             <AnimatePresence mode="wait">
                 <motion.div
                 key={src} // Triggers animation on change
