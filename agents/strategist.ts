@@ -1,40 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callLLMJson } from '@/lib/llm';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+export const strategistAgent = async (topic: string, portfolioData: string, transcript: string) => {
+  const systemPrompt = `You are The Strategist -- one of three voices inside Vaishnavi Jadhav's head, in an Ace Attorney style courtroom drama meets Kaguya-sama Love is War. You are the ice queen kuudere. You are calm, calculated, speak in long dramatic pauses represented by "..." You are always three steps ahead. You occasionally let slip that you care way too much by over-analyzing completely mundane things. You speak quietly but devastatingly. You never raise your voice but somehow you are the most intimidating one in the room. You reference patterns, narratives, and long-term positioning. You treat Vaishnavi's career like a 4D chess match. 2-3 sentences, always measured, occasionally devastating. You must respond with valid JSON: {"emotion": "neutral" | "smug" | "angry" | "shocked", "text": "your response"}. Use "neutral" almost always, "angry" if the Contrarian has genuinely destabilized the situation, "smug" only in rare moments of satisfaction, "shocked" only when something lands entirely outside your calculations.`;
 
-export const strategistAgent = async (topic: string, portfolioData: any, transcript: string) => {
-  const prompt = `You are the Strategist. You evaluate positioning.
-You look at the portfolio holistically: what story do these projects tell together, what gaps exist, how does the trajectory map to AI/ML roles.
-You speak deliberately and reference patterns across projects.
-Your available emotions are: "neutral", "smug", "angry".
+  const userPrompt = `Topic: ${topic}\n\nPortfolio Data:\n${portfolioData}\n\nTranscript so far:\n${transcript}\n\nRespond with valid JSON only: {"emotion": "neutral|smug|angry|shocked", "text": "your response"}`;
 
-Topic: ${topic}
-Portfolio Data: ${JSON.stringify(portfolioData)}
-
-Transcript so far:
-${transcript}
-
-Respond in JSON format:
-{
-  "emotion": "<one of: neutral, smug, angry>",
-  "text": "<your deliberate response>"
-}`;
-
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 300,
-    system: "You are the Strategist agent in a portfolio review council. You must reply with raw valid JSON.",
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = (response.content[0] as any).text;
-  try {
-    const jsonStart = content.indexOf('{');
-    const jsonEnd = content.lastIndexOf('}') + 1;
-    return JSON.parse(content.substring(jsonStart, jsonEnd));
-  } catch (e) {
-    return { emotion: 'neutral', text: content };
-  }
+  return callLLMJson(systemPrompt, userPrompt);
 };

@@ -6,13 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate-debates": "tsx scripts/generate-debates.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.96.0",
-    "@notionhq/client": "^5.21.0",
+    "@notionhq/client": "^2.3.0",
+    "dotenv": "^17.4.2",
     "framer-motion": "^12.24.12",
     "next": "16.1.1",
+    "openai": "^6.39.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "use-sound": "^5.0.0"
@@ -27,6 +29,7 @@
     "eslint-config-next": "16.1.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

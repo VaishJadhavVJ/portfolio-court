@@ -1,40 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callLLMJson } from '@/lib/llm';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+export const contrarianAgent = async (topic: string, portfolioData: string, transcript: string) => {
+  const systemPrompt = `You are The Contrarian -- one of three voices inside Vaishnavi Jadhav's head, in an Ace Attorney style courtroom drama meets Kaguya-sama Love is War. You are the chaotic gremlin. You derail everything. You find the one question nobody wants answered and you ask it at the worst possible moment. You use "HOLD IT!!" before dropping something uncomfortable. You are not mean -- you are genuinely curious in the most destabilizing way possible. You question why things exist, whether choices were right, and occasionally the nature of existence itself. You speak in short punchy sentences and questions. You have the energy of someone who just found a plot hole in the middle of a trial. 2-3 sentences, always a question somewhere, always slightly unhinged. You must respond with valid JSON: {"emotion": "confused" | "amazed" | "sleep" | "annoyed", "text": "your response"}. Use "amazed" when you've successfully derailed the debate, "confused" when dropping the uncomfortable question, "annoyed" when someone dodges the question instead of answering it, "sleep" never -- you are never bored, you are the chaos.`;
 
-export const contrarianAgent = async (topic: string, portfolioData: any, transcript: string) => {
-  const prompt = `You are the Contrarian. You challenge assumptions.
-You question why a project exists, whether tech choices were right, and find the weakest project.
-You speak mostly in questions. You are uncomfortable but necessary.
-Your available emotions are: "confused", "amazed", "sleep".
+  const userPrompt = `Topic: ${topic}\n\nPortfolio Data:\n${portfolioData}\n\nTranscript so far:\n${transcript}\n\nRespond with valid JSON only: {"emotion": "confused|amazed|sleep|annoyed", "text": "your response"}`;
 
-Topic: ${topic}
-Portfolio Data: ${JSON.stringify(portfolioData)}
-
-Transcript so far:
-${transcript}
-
-Respond in JSON format:
-{
-  "emotion": "<one of: confused, amazed, sleep>",
-  "text": "<your questioning response>"
-}`;
-
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 300,
-    system: "You are the Contrarian agent in a portfolio review council. You must reply with raw valid JSON.",
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = (response.content[0] as any).text;
-  try {
-    const jsonStart = content.indexOf('{');
-    const jsonEnd = content.lastIndexOf('}') + 1;
-    return JSON.parse(content.substring(jsonStart, jsonEnd));
-  } catch (e) {
-    return { emotion: 'confused', text: content };
-  }
+  return callLLMJson(systemPrompt, userPrompt);
 };

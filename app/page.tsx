@@ -84,7 +84,7 @@ export default async function Lobby() {
             href="/court" 
             className="inline-flex items-center gap-3 text-sm font-bold bg-black text-white px-5 py-3 hover:bg-red-600 transition-colors"
           >
-            <span>ENTER THE COURTROOM ⚖️</span>
+            <span>my brain is at war →</span>
           </Link>
         </div>
       </section>

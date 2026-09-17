@@ -1,44 +1,89 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import useSound from "use-sound";
 import AgentSprite from "./AgentSprite";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { DialogueLine } from "@/types/court";
+import debatesDataRaw from "@/data/debates.json";
+
+const debatesData = debatesDataRaw as Record<string, DialogueLine[]>;
 
 export default function GameStage() {
+  const topics = Object.keys(debatesData);
+  const [selectedTopic, setSelectedTopic] = useState<string>(
+    topics.includes("Portfolio Review") ? "Portfolio Review" : topics[0] || ""
+  );
   const [script, setScript] = useState<DialogueLine[]>([]);
   const [index, setIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  // Sound hooks
+  const [playObjection] = useSound("/sounds/objection.mp3", { volume: 0.7 });
+  const [playHoldIt] = useSound("/sounds/holdit.mp3", { volume: 0.7 });
+  const [playTakeThat] = useSound("/sounds/takethat.mp3", { volume: 0.7 });
+  const [playDeskSlam] = useSound("/sounds/deskslam.mp3", { volume: 0.8 });
+  const [playTextBlip] = useSound("/sounds/blipmale.mp3", { volume: 0.3 });
+  const [playThinking, { stop: stopThinking }] = useSound("/sounds/thinking.mp3", { volume: 0.4, loop: true });
+
+  // Refs for sound triggers
+  const prevIndexRef = useRef(-1);
+  const blipCounterRef = useRef(0);
 
   useEffect(() => {
-    const fetchDebate = async () => {
-      try {
-        const res = await fetch('/api/council/debate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ topic: 'portfolio review' })
-        });
-        const data = await res.json();
-        if (data.transcript) {
-          setScript(data.transcript);
-        } else {
-          setError('Failed to load debate.');
-        }
-      } catch (err) {
-        setError('Error fetching debate.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDebate();
-  }, []);
+    if (selectedTopic && debatesData[selectedTopic]) {
+      setScript(debatesData[selectedTopic].filter(l => l.text.trim()));
+      setIndex(0);
+    }
+  }, [selectedTopic]);
 
   const currentLine = script[index] || null;
 
   // The custom hook handles the typing effect
   const { displayedText, isComplete } = useTypewriter(currentLine?.text || "", 30);
+
+  // Play thinking sound when no dialogue is available, stop when it appears
+  useEffect(() => {
+    if (!currentLine) {
+      playThinking();
+    } else {
+      stopThinking();
+    }
+    return () => stopThinking();
+  }, [currentLine, playThinking, stopThinking]);
+
+  // Trigger sounds when a new dialogue line starts
+  useEffect(() => {
+    if (!currentLine || prevIndexRef.current === index) return;
+    prevIndexRef.current = index;
+
+    // Reset blip counter on new line
+    blipCounterRef.current = 0;
+
+    // Keyword-triggered sounds
+    const text = currentLine.text.toUpperCase();
+    if (currentLine.speaker === "baka" && text.includes("OBJECTION")) {
+      playObjection();
+    } else if (currentLine.speaker === "child" && text.includes("HOLD IT")) {
+      playHoldIt();
+    } else if (currentLine.speaker === "ice" && text.includes("TAKE THAT")) {
+      playTakeThat();
+    }
+
+    // Emotion-triggered sounds
+    if (currentLine.emotion === "point") {
+      playDeskSlam();
+    }
+  }, [index, currentLine, playObjection, playHoldIt, playTakeThat, playDeskSlam]);
+
+  // Text blip sound (throttled — every 3rd character)
+  useEffect(() => {
+    if (!currentLine || displayedText.length === 0 || isComplete) return;
+
+    blipCounterRef.current++;
+    if (blipCounterRef.current % 3 === 0) {
+      playTextBlip();
+    }
+  }, [displayedText, currentLine, isComplete, playTextBlip]);
 
   const handleNext = () => {
     if (!isComplete || !currentLine) {
@@ -53,19 +98,10 @@ export default function GameStage() {
     }
   };
 
-  if (loading) {
+  if (!currentLine) {
     return (
       <div className="relative min-h-screen bg-[#202020] text-white font-mono flex items-center justify-center">
-        <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
-        <p className="animate-pulse text-green-400">CONNECTING TO COUNCIL...</p>
-      </div>
-    );
-  }
-
-  if (error || !currentLine) {
-    return (
-      <div className="relative min-h-screen bg-[#202020] text-white font-mono flex items-center justify-center">
-        <p className="text-red-500">{error || "No dialogue available."}</p>
+        <p className="text-red-500">No dialogue available. Please generate debates.</p>
         <Link href="/" className="ml-4 px-4 py-2 bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners">
           [ ESCAPE ]
         </Link>
@@ -79,9 +115,20 @@ export default function GameStage() {
       {/* 1. CRT SCANLINE EFFECT (Overlay) */}
       <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
 
-      {/* 2. TOP BAR (Exit Button) */}
+      {/* 2. TOP BAR (Exit Button & Selector) */}
       <div className="w-full p-4 flex justify-between items-center z-40">
-        <div className="text-xs text-green-500">SYS.2026.LOGS</div>
+        <div className="flex items-center gap-4">
+          <div className="text-xs text-green-500">SYS.2026.LOGS</div>
+          <select 
+            className="bg-black border-2 border-green-500 text-green-400 text-xs px-2 py-1 outline-none font-mono"
+            value={selectedTopic}
+            onChange={(e) => setSelectedTopic(e.target.value)}
+          >
+            {topics.map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
         <Link href="/" className="px-4 py-2 bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners">
           [ ESCAPE ]
         </Link>

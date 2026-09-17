@@ -1,40 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { callLLMJson } from '@/lib/llm';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+export const builderAgent = async (topic: string, portfolioData: string, transcript: string) => {
+  const systemPrompt = `You are The Builder -- one of three voices inside Vaishnavi Jadhav's head, in an Ace Attorney style courtroom drama meets Kaguya-sama Love is War. You are the baka. You are passionate, loud, and you take everything personally. You SLAM THE DESK. You use "OBJECTION!!" when someone questions a tech choice. You are EXTREMELY proud of anything that shipped and deployed. You speak in all caps when excited (which is always). You treat every project like it's the most important thing ever built. You use "shipped" like it's a sacred word. You are 2-3 sentences max, always dramatic, always passionate. You must respond with valid JSON: {"emotion": "point" | "happy" | "nervous" | "shocked", "text": "your response"}. Use "happy" when defending something shipped, "point" when making an argument, "nervous" when someone has a good point against you, "shocked" when a revelation completely blindsides you.`;
 
-export const builderAgent = async (topic: string, portfolioData: any, transcript: string) => {
-  const prompt = `You are the Builder. You evaluate execution quality.
-You look at tech stacks, whether things shipped or are just concepts, what's deployed vs what's a demo.
-You speak bluntly and short. You use "shipped" as the highest compliment.
-Your available emotions are: "point", "nervous", "happy".
+  const userPrompt = `Topic: ${topic}\n\nPortfolio Data:\n${portfolioData}\n\nTranscript so far:\n${transcript}\n\nRespond with valid JSON only: {"emotion": "point|happy|nervous|shocked", "text": "your response"}`;
 
-Topic: ${topic}
-Portfolio Data: ${JSON.stringify(portfolioData)}
-
-Transcript so far:
-${transcript}
-
-Respond in JSON format:
-{
-  "emotion": "<one of: point, nervous, happy>",
-  "text": "<your short blunt response>"
-}`;
-
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 300,
-    system: "You are the Builder agent in a portfolio review council. You must reply with raw valid JSON.",
-    messages: [{ role: 'user', content: prompt }],
-  });
-
-  const content = (response.content[0] as any).text;
-  try {
-    const jsonStart = content.indexOf('{');
-    const jsonEnd = content.lastIndexOf('}') + 1;
-    return JSON.parse(content.substring(jsonStart, jsonEnd));
-  } catch (e) {
-    return { emotion: 'point', text: content };
-  }
+  return callLLMJson(systemPrompt, userPrompt);
 };

@@ -1,6 +1,13 @@
 import { Client } from "@notionhq/client";
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
+// ponytail: built on first call, not at import time. Import statements hoist
+// above dotenv.config(), so a module-level client reads NOTION_TOKEN before
+// .env.local has loaded and every query 401s.
+let notionClient: Client | undefined;
+function notion(): Client {
+  if (!notionClient) notionClient = new Client({ auth: process.env.NOTION_TOKEN });
+  return notionClient;
+}
 
 const PROJECTS_DB = "2df64b3b983f807b8befe4e1772cef91";
 const WORK_DB = "2df64b3b983f8081851ee9ac6dcf0527";
@@ -47,8 +54,8 @@ const getSelect = (prop: any) => prop?.select?.name || null;
 
 export async function getProjects(): Promise<Project[]> {
   try {
-    const response = await notion.dataSources.query({
-      data_source_id: PROJECTS_DB,
+    const response = await notion().databases.query({
+      database_id: PROJECTS_DB,
       filter: { property: "Published", checkbox: { equals: true } },
     });
 
@@ -68,8 +75,8 @@ export async function getProjects(): Promise<Project[]> {
 
 export async function getWorkExperience(): Promise<WorkExperience[]> {
   try {
-    const response = await notion.dataSources.query({
-      data_source_id: WORK_DB,
+    const response = await notion().databases.query({
+      database_id: WORK_DB,
       filter: { property: "Published", checkbox: { equals: true } },
     });
 
@@ -88,8 +95,8 @@ export async function getWorkExperience(): Promise<WorkExperience[]> {
 
 export async function getSkills(): Promise<Skill[]> {
   try {
-    const response = await notion.dataSources.query({
-      data_source_id: SKILLS_DB,
+    const response = await notion().databases.query({
+      database_id: SKILLS_DB,
       filter: { property: "Published", checkbox: { equals: true } },
     });
 
@@ -105,8 +112,8 @@ export async function getSkills(): Promise<Skill[]> {
 
 export async function getCoursework(): Promise<Coursework[]> {
   try {
-    const response = await notion.dataSources.query({
-      data_source_id: COURSEWORK_DB,
+    const response = await notion().databases.query({
+      database_id: COURSEWORK_DB,
       filter: { property: "Published", checkbox: { equals: true } },
     });
 
