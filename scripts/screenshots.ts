@@ -9,6 +9,7 @@
 import { chromium, type ConsoleMessage, type Request } from 'playwright';
 import * as fs from 'fs';
 import debatesRaw from '../data/debates.json';
+import { playDebate } from './play-debate';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
 const OUT = 'screenshots';
@@ -62,6 +63,19 @@ async function main() {
 
       let note = '';
       if (page.name === 'court') {
+        // Play a debate to the last line first. A build that renders line 1 but
+        // cannot advance used to pass every check here; it never clicked.
+        const topics: string[] = await p.$$eval('select option', (os) => os.map((o) => (o as HTMLOptionElement).value));
+        const sample = topics.slice(0, 3);
+        for (const topic of sample) {
+          const r = await playDebate(p, topic);
+          if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" stuck at line ${r.stuckAt}/${r.total}`);
+        }
+        note += `  played ${sample.length} debates to the end`;
+        await p.reload({ waitUntil: 'networkidle' });
+        await p.waitForTimeout(400);
+        await p.screenshot({ path: shot });
+
         // Does any line in the whole dataset overflow the fixed-height box?
         const overflow = await p.evaluate((texts: string[]) => {
           const box = document.querySelector('[data-testid="dialogue-text"]') as HTMLElement | null;
@@ -81,9 +95,9 @@ async function main() {
         if (overflow.missing) problems.push(`${page.name}@${vp.label}: dialogue box not found`);
         else if (overflow.count > 0) {
           problems.push(`${page.name}@${vp.label}: ${overflow.count}/${allTexts.length} lines overflow by up to ${overflow.worst}px ("${overflow.sample}...")`);
-          note = `  ${overflow.count} lines overflow (worst +${overflow.worst}px)`;
+          note += `  | ${overflow.count} lines overflow (worst +${overflow.worst}px)`;
         } else {
-          note = `  all ${allTexts.length} lines fit`;
+          note += `  | all ${allTexts.length} lines fit`;
         }
 
         // Top bar must not overlap on narrow screens.

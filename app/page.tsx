@@ -43,7 +43,7 @@ export default async function Lobby() {
 
   const SOCIAL_LINKS = [
     { label: "GitHub", href: "https://github.com/VaishJadhavVJ" },
-    { label: "LinkedIn", href: "https://linkedin.com/in/vaishjadhav" },
+    { label: "LinkedIn", href: "https://linkedin.com/in/vaishnavipjadhav" },
     { label: "Email", href: "mailto:vaishjadhav@gmail.com" },
     { label: "Portfolio", href: "https://heyvaish.dev" },
   ];

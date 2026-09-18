@@ -51,6 +51,12 @@ export default function GameStage() {
   const [stagedBg, setStagedBg] = useState<string>(firstLine ? BACKGROUNDS[firstLine.speaker] : BACKGROUNDS.baka);
   const [transitioning, setTransitioning] = useState(false);
   const spriteControls = useAnimationControls();
+  const stagedRef = useRef(staged);
+  const transitionRunRef = useRef(0);
+  const applyStaged = (v: { speaker: AgentName; emotion: Emotion }) => {
+    stagedRef.current = v;
+    setStaged(v);
+  };
 
   // Sound hooks
   const [playObjection] = useSound("/sounds/objection.mp3", { volume: 0.7 });
@@ -115,53 +121,63 @@ export default function GameStage() {
 
   // Speaker-change choreography. Same speaker twice in a row is not a
   // transition at all -- the sprite just swaps emotion in place.
+  //
+  // `staged` is mirrored into a ref so this effect does NOT depend on it. It
+  // used to: step 3 called setStaged, which re-ran the effect, fired the
+  // cleanup, set cancelled = true, and skipped the line releasing
+  // `transitioning`. The flag latched on and every click after line 2 was
+  // swallowed. The release now lives in a finally, owned by the newest run.
   useEffect(() => {
     if (!currentLine) return;
+    const prev = stagedRef.current;
     const next = { speaker: currentLine.speaker, emotion: currentLine.emotion };
 
-    if (!staged) {
-      setStaged(next);
+    if (!prev || prev.speaker === next.speaker) {
+      applyStaged(next);
       setStagedBg(BACKGROUNDS[next.speaker]);
-      return;
-    }
-
-    if (staged.speaker === next.speaker) {
-      if (staged.emotion !== next.emotion) setStaged(next);
+      // Restore visibility in case a transition was interrupted mid fade-out.
+      spriteControls.start({ opacity: 1, scale: 1, transition: { duration: 0.12 } });
       return;
     }
 
     let cancelled = false;
+    const runId = ++transitionRunRef.current;
+
     (async () => {
       setTransitioning(true);
+      try {
+        // 1. outgoing character shrinks slightly and fades out
+        await spriteControls.start({
+          opacity: 0,
+          scale: 0.92,
+          transition: { duration: OUT_MS / 1000, ease: "easeIn" },
+        });
+        if (cancelled) return;
 
-      // 1. outgoing character shrinks slightly and fades out
-      await spriteControls.start({
-        opacity: 0,
-        scale: 0.92,
-        transition: { duration: OUT_MS / 1000, ease: "easeIn" },
-      });
-      if (cancelled) return;
+        // 2. background cross-fades
+        setStagedBg(BACKGROUNDS[next.speaker]);
+        await new Promise((r) => setTimeout(r, BG_MS));
+        if (cancelled) return;
 
-      // 2. background cross-fades
-      setStagedBg(BACKGROUNDS[next.speaker]);
-      await new Promise((r) => setTimeout(r, BG_MS));
-      if (cancelled) return;
-
-      // 3. incoming character scales up from slightly smaller and fades in
-      setStaged(next);
-      await spriteControls.start({
-        opacity: 1,
-        scale: 1,
-        transition: { duration: IN_MS / 1000, ease: "easeOut" },
-      });
-      if (!cancelled) setTransitioning(false);
+        // 3. incoming character scales up from slightly smaller and fades in
+        applyStaged(next);
+        await spriteControls.start({
+          opacity: 1,
+          scale: 1,
+          transition: { duration: IN_MS / 1000, ease: "easeOut" },
+        });
+      } finally {
+        // Always release -- an early return above still runs this. Only the
+        // newest run owns the flag, so a superseded run cannot clear it early.
+        if (transitionRunRef.current === runId) setTransitioning(false);
+      }
     })();
 
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLine, staged, spriteControls]);
+  }, [currentLine, spriteControls]);
 
   const handleTopicChange = (topic: string) => {
     setSelectedTopic(topic);
@@ -288,6 +304,7 @@ export default function GameStage() {
       <div className="shrink-0 w-[95vw] max-w-[1300px] mx-auto z-40 pb-3 sm:pb-4">
         <div
           onClick={handleNext}
+          data-testid="dialogue-box"
           className="bg-black/95 border-4 border-white relative cursor-pointer hover:border-green-400 transition-colors shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)]"
         >
           {/* Speaker nameplate, flush into the top-left corner of the box */}
@@ -315,7 +332,8 @@ export default function GameStage() {
         </div>
 
         <div className="text-center mt-1 text-[10px] sm:text-xs text-gray-500">
-          [ CLICK TO {isComplete ? "CONTINUE" : "SKIP"} ] &nbsp;·&nbsp; {index + 1}/{script.length}
+          [ CLICK TO {isComplete ? "CONTINUE" : "SKIP"} ] &nbsp;·&nbsp;{" "}
+          <span data-testid="line-counter">{index + 1}/{script.length}</span>
         </div>
       </div>
 
