@@ -23,12 +23,6 @@ export const metadata: Metadata = {
   title: "Vaishnavi Jadhav",
   description:
     "MS Computer Science at UIC, Applied AI/ML. Building intelligent systems and agentic workflows.",
-  // Generated from the ice-smug sprite. app/icon.png and app/apple-icon.png are
-  // picked up by the App Router file convention; these entries make it explicit.
-  icons: {
-    icon: "/icon.png",
-    apple: "/apple-icon.png",
-  },
 };
 
 export default function RootLayout({
