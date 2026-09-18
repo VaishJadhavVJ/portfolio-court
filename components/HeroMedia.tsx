@@ -29,6 +29,9 @@ export default function HeroMedia() {
   // Measured optima (static frame): 390 -> 19%, 768 -> 23%, 1440 -> 0%.
   const shared =
     "absolute inset-0 h-full w-full object-cover object-[20%_center] md:object-[24%_center] lg:object-[6%_center]";
+  // The still is shown at or below its native width, so nearest keeps it crisp.
+  // The video is upscaled ~1.5x on desktop, where nearest turns the upscale into
+  // visible blocks -- it is left to the browser to smooth.
   const pixels = { imageRendering: "pixelated" as const };
 
   if (!useVideo) {
@@ -54,7 +57,6 @@ export default function HeroMedia() {
       poster="/backgrounds/court-exterior.webp"
       aria-hidden
       className={shared}
-      style={pixels}
       data-testid="hero-video"
     >
       <source src="/backgrounds/court-exterior.webm" type="video/webm" />

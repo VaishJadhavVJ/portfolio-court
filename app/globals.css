@@ -57,31 +57,28 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
 }
 
-/* Hero legibility.
-   Below 768px the hero is the STATIC WebP -- nothing moves, the tuned crop puts
-   charcoal on clear sky, and measurement showed 0% of edge pixels under 4.5. A
-   shadow there solves a problem that does not exist, so there is none.
-   From 768px the video plays and leaves sweep the sky: white text, with a
-   zero-blur ring on the display line (blur cannot hold alpha 1px out) and a
-   softer drop on the sublines, where that ring reads as emboldened at 16px. */
-.hero-crisp,
-.hero-soft {
-  text-shadow: none;
+/* Hero geometry, shared with the scroll overlay so the darkening ramp can be
+   placed strictly AFTER the hero ends. The hero must show the scene at full
+   brightness, so nothing may tint it. */
+:root {
+  --header-h: 56px;
+  --hero-h: max(62vh, 380px);
+}
+@media (min-width: 640px) {
+  :root {
+    --hero-h: min(70vh, 660px);
+  }
 }
 
-@media (min-width: 768px) {
-  .hero-crisp {
-    text-shadow:
-      1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000,
-      1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000,
-      0 1px 3px rgba(0, 0, 0, 0.75);
-  }
-  .hero-soft {
-    text-shadow:
-      0 1px 2px rgba(0, 0, 0, 0.80),
-      0 0 3px rgba(0, 0, 0, 0.70),
-      0 0 6px rgba(0, 0, 0, 0.50);
-  }
+/* Hero legibility: a soft drop only. No zero-blur ring -- that reads retro, and
+   this page is not. Layered small-to-large so it stays a shadow rather than a
+   glow: the tight layers do the separating, the wide one only adds weight. */
+.hero-soft {
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.85),
+    0 0 2px rgba(0, 0, 0, 0.75),
+    0 0 5px rgba(0, 0, 0, 0.60),
+    0 2px 10px rgba(0, 0, 0, 0.40);
 }
 
 /* One orchestrated page-load stagger. CSS only, so the page stays a server component. */

@@ -33,10 +33,15 @@ const ABOUT =
 const OVERLAY =
   "linear-gradient(to bottom," +
   " rgba(0,0,0,0) 0," +
-  " rgba(0,0,0,0.30) 68vh," +
+  " rgba(0,0,0,0) calc(var(--header-h) + var(--hero-h))," +
+  " rgba(0,0,0,0.30) calc(var(--header-h) + var(--hero-h) + 34vh)," +
   " rgba(0,0,0,0.30) calc(100% - 1150px)," +
   " rgba(0,0,0,1) calc(100% - 640px)," +
   " rgba(0,0,0,1) 100%)";
+
+// No PDF exists in public/ yet -- this is the conventional path; the link 404s
+// until the file is added.
+const RESUME = "/resume.pdf";
 
 const year = (d: string | null) => (d ? new Date(d).getFullYear() : "");
 
@@ -160,24 +165,40 @@ export default async function Lobby() {
         </nav>
       </header>
 
-      {/* HERO — no scrim. Text sits directly on the open sky. */}
+      {/* HERO — nothing tints this. The scene runs at full brightness. */}
       <section id="top" className="relative z-10 h-[62vh] min-h-[380px] w-full sm:h-[70vh] sm:max-h-[660px]">
-        <div className="relative mx-auto flex h-full max-w-[900px] flex-col justify-start px-4 pt-10 sm:px-6 sm:pt-14">
-          <h1 className="hero-crisp rise max-w-[11ch] font-serif text-[clamp(2.4rem,8.5vw,4.6rem)] leading-[0.92] tracking-[-0.02em] text-[var(--ink)] md:text-white">
-            building for the bees
+        <div className="relative mx-auto flex h-full max-w-[900px] flex-col justify-start px-4 pt-9 sm:px-6 sm:pt-14">
+          <h1 className="hero-soft rise font-serif text-[clamp(2.5rem,7.6vw,4.4rem)] leading-[1.02] tracking-[-0.02em] text-white">
+            Vaishnavi Jadhav
           </h1>
           <p
-            className="hero-soft rise mt-5 max-w-[290px] text-[14px] font-semibold leading-relaxed text-[var(--ink)] sm:mt-6 sm:max-w-[360px] sm:text-base md:text-white lg:max-w-[420px]"
-            style={{ animationDelay: "120ms" }}
+            className="hero-soft rise mt-1 text-[clamp(1.3rem,4vw,2.05rem)] font-medium leading-tight tracking-tight text-white"
+            style={{ animationDelay: "100ms" }}
           >
-            {"Vaishnavi Jadhav — MS Computer Science @ UIC, Applied AI/ML."}
+            MS CS @ UIC
           </p>
           <p
-            className="hero-soft rise mt-1.5 max-w-[290px] text-[14px] font-semibold leading-relaxed text-[var(--ink)] sm:max-w-[360px] sm:text-base md:text-white lg:max-w-[420px]"
-            style={{ animationDelay: "200ms" }}
+            className="hero-soft rise mt-4 text-[14px] font-medium leading-relaxed text-white sm:text-[15px]"
+            style={{ animationDelay: "180ms" }}
           >
-            {"11 shipped projects. Looking for 2027 full-time opportunities."}
+            Looking for 2027 full-time opportunities
           </p>
+
+          <div className="rise mt-7 flex flex-wrap items-center gap-3" style={{ animationDelay: "260ms" }}>
+            <Link
+              href="/court"
+              className="rounded-full bg-white px-4 py-2.5 text-[13px] font-medium text-black transition-colors hover:bg-[var(--accent)] hover:text-white sm:text-sm"
+            >
+              my brain is at war →
+            </Link>
+            <a
+              href={RESUME}
+              download
+              className="rounded-full border border-white/55 bg-black/45 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:border-white hover:bg-black/65 sm:text-sm"
+            >
+              resume ↓
+            </a>
+          </div>
         </div>
       </section>
 
