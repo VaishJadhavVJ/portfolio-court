@@ -34,14 +34,12 @@ const OVERLAY =
   "linear-gradient(to bottom," +
   " rgba(0,0,0,0) 0," +
   " rgba(0,0,0,0) calc(var(--header-h) + var(--hero-h))," +
-  " rgba(0,0,0,0.30) calc(var(--header-h) + var(--hero-h) + 34vh)," +
-  " rgba(0,0,0,0.30) calc(100% - 1150px)," +
-  " rgba(0,0,0,1) calc(100% - 640px)," +
+  " rgba(0,0,0,0.18) calc(var(--header-h) + var(--hero-h) + 34vh)," +
+  " rgba(0,0,0,0.18) calc(100% - 1390px)," +
+  " rgba(0,0,0,1) calc(100% - 880px)," +
   " rgba(0,0,0,1) 100%)";
 
-// No PDF exists in public/ yet -- this is the conventional path; the link 404s
-// until the file is added.
-const RESUME = "/resume.pdf";
+const RESUME = "/Vaishnavi_Jadhav_resume_FTE.pdf";
 
 const year = (d: string | null) => (d ? new Date(d).getFullYear() : "");
 
@@ -127,8 +125,8 @@ export default async function Lobby() {
       {/* Scroll-coupled darkening (see OVERLAY) */}
       <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: OVERLAY }} />
 
-      {/* NAVBAR */}
-      <header className="sticky top-0 z-50 border-b border-[var(--card-rule)] bg-black/55">
+      {/* NAVBAR — light bar, black type, no blur */}
+      <header className="sticky top-0 z-50 border-b border-black/10 bg-[#f7f6f2]">
         <nav className="mx-auto flex h-14 max-w-[900px] items-center gap-2 px-3 sm:gap-5 sm:px-6">
           <a href="#top" aria-label="Top" className="shrink-0">
             <Image
@@ -143,12 +141,12 @@ export default async function Lobby() {
             />
           </a>
 
-          <ul className="no-scrollbar flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto font-mono text-[9px] uppercase tracking-[0.1em] text-[var(--on-dark-soft)] sm:gap-6 sm:text-[11px] sm:tracking-[0.18em]">
+          <ul className="no-scrollbar flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto font-mono text-[9px] uppercase tracking-[0.1em] text-black sm:gap-6 sm:text-[11px] sm:tracking-[0.18em]">
             {NAV.map(n => (
               <li key={n.href}>
                 <a
                   href={n.href}
-                  className="whitespace-nowrap border-b border-transparent pb-0.5 transition-colors hover:border-[var(--on-dark)] hover:text-[var(--on-dark)]"
+                  className="whitespace-nowrap border-b border-transparent pb-0.5 transition-colors hover:border-black hover:text-black"
                 >
                   {n.label}
                 </a>
@@ -158,27 +156,28 @@ export default async function Lobby() {
 
           <Link
             href="/court"
-            className="shrink-0 whitespace-nowrap rounded-full bg-[var(--on-dark)] px-2.5 py-1.5 font-medium text-[9px] text-black transition-colors hover:bg-[var(--accent)] hover:text-[var(--on-dark)] sm:px-4 sm:text-xs"
+            className="shrink-0 whitespace-nowrap rounded-full bg-black px-2.5 py-1.5 font-medium text-[9px] text-white transition-colors hover:bg-[var(--accent)] sm:px-4 sm:text-xs"
           >
             my brain is at war →
           </Link>
         </nav>
       </header>
 
-      {/* HERO — nothing tints this. The scene runs at full brightness. */}
+      {/* HERO — nothing tints this and nothing sits behind the type.
+          Plain white on the sky. */}
       <section id="top" className="relative z-10 h-[62vh] min-h-[380px] w-full sm:h-[70vh] sm:max-h-[660px]">
-        <div className="relative mx-auto flex h-full max-w-[900px] flex-col justify-start px-4 pt-9 sm:px-6 sm:pt-14">
-          <h1 className="hero-soft rise font-serif text-[clamp(2.5rem,7.6vw,4.4rem)] leading-[1.02] tracking-[-0.02em] text-white">
+        <div className="relative mx-auto flex h-full max-w-[900px] flex-col justify-start px-4 pt-8 sm:px-6 sm:pt-12">
+          <h1 className="rise font-serif text-[clamp(3.25rem,11vw,6.5rem)] leading-[0.98] tracking-[-0.025em] text-white">
             Vaishnavi Jadhav
           </h1>
           <p
-            className="hero-soft rise mt-1 text-[clamp(1.3rem,4vw,2.05rem)] font-medium leading-tight tracking-tight text-white"
+            className="rise mt-2 text-[clamp(1.75rem,6vw,3.25rem)] font-medium leading-[1.1] tracking-tight text-white"
             style={{ animationDelay: "100ms" }}
           >
             MS CS @ UIC
           </p>
           <p
-            className="hero-soft rise mt-4 text-[14px] font-medium leading-relaxed text-white sm:text-[15px]"
+            className="rise mt-4 text-[clamp(1rem,2.4vw,1.375rem)] font-medium leading-snug text-white"
             style={{ animationDelay: "180ms" }}
           >
             Looking for 2027 full-time opportunities
@@ -187,14 +186,14 @@ export default async function Lobby() {
           <div className="rise mt-7 flex flex-wrap items-center gap-3" style={{ animationDelay: "260ms" }}>
             <Link
               href="/court"
-              className="rounded-full bg-white px-4 py-2.5 text-[13px] font-medium text-black transition-colors hover:bg-[var(--accent)] hover:text-white sm:text-sm"
+              className="rounded-full bg-white px-5 py-3 text-sm font-medium text-black transition-colors hover:bg-[var(--accent)] hover:text-white"
             >
               my brain is at war →
             </Link>
             <a
               href={RESUME}
               download
-              className="rounded-full border border-white/55 bg-black/45 px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:border-white hover:bg-black/65 sm:text-sm"
+              className="rounded-full border border-white/60 bg-black/65 px-5 py-3 text-sm font-medium text-white transition-colors hover:border-white hover:bg-black/80"
             >
               resume ↓
             </a>
@@ -353,18 +352,47 @@ export default async function Lobby() {
           </ul>
         </Card>
 
-        <footer className="relative z-10 mt-16 flex items-center justify-between border-t border-[var(--card-rule)] pt-6">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--on-dark-muted)]">
-            Vaishnavi Jadhav · 2026
-          </p>
-          <Link
-            href="/court"
-            className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--on-dark-muted)] transition-colors hover:text-[var(--accent)]"
-          >
-            my brain is at war →
-          </Link>
-        </footer>
       </main>
+
+      {/* FOOTER — the meadow. Bright surface, dark type, deliberately the
+          opposite of the darkened page it follows. */}
+      <footer className="relative z-10 w-full overflow-hidden">
+        <Image
+          src="/backgrounds/footer-meadow-strip.webp"
+          alt=""
+          aria-hidden
+          fill
+          unoptimized
+          sizes="100vw"
+          className="object-cover object-bottom"
+          style={{ imageRendering: "pixelated" }}
+        />
+        <div className="pointer-events-none absolute inset-0 bg-white/55" />
+        <div className="relative mx-auto flex min-h-[300px] max-w-[900px] flex-col justify-between gap-8 px-4 py-10 sm:min-h-[340px] sm:px-6 sm:py-12">
+          <p className="font-serif text-[clamp(2rem,6vw,3.25rem)] leading-[1.02] tracking-[-0.02em] text-[#12200b]">
+            building for the bees
+          </p>
+          <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+            <ul className="flex flex-wrap gap-x-6 gap-y-2">
+              {LINKS.map(link => (
+                <li key={link.label}>
+                  <a
+                    href={link.href}
+                    target={link.href.startsWith("mailto:") ? undefined : "_blank"}
+                    rel="noreferrer"
+                    className="border-b border-[#12200b]/45 pb-0.5 text-sm font-semibold text-[#12200b] transition-colors hover:border-[#12200b] sm:text-base"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#12200b]">
+              Vaishnavi Jadhav · 2026
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
