@@ -33,7 +33,11 @@ export default async function Lobby() {
   skills.forEach(skill => {
     skill.category.forEach(cat => {
       if (!skillsByCategory[cat]) skillsByCategory[cat] = [];
-      skillsByCategory[cat].push(skill);
+      // Notion has duplicate rows for a few skills; showing the same chip twice
+      // is a visible bug and collides React keys.
+      if (!skillsByCategory[cat].some(s => s.name === skill.name)) {
+        skillsByCategory[cat].push(skill);
+      }
     });
   });
 

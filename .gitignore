@@ -42,3 +42,6 @@ next-env.d.ts
 
 # sliced sprite staging
 tmp-sprites/
+
+# playwright output
+screenshots/
