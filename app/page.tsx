@@ -1,9 +1,88 @@
 // app/page.tsx
+import Image from "next/image";
 import Link from "next/link";
-import { HEADER_INFO as LOBBY_HEADER, SOCIAL_LINKS as LOBBY_SOCIALS, PROJECTS as LOBBY_PROJECTS } from "@/data/lobby";
 import { getProjects, getWorkExperience, getSkills, getCoursework } from "@/lib/notion";
+import HeroMedia from "@/components/HeroMedia";
 
 export const revalidate = 60; // Revalidate every 60 seconds (optional, but good for CMS)
+
+const NAV = [
+  { label: "The Record", href: "#work" },
+  { label: "Credentials", href: "#skills" },
+  { label: "Contact", href: "#contact" },
+];
+
+const LINKS = [
+  { label: "GitHub", href: "https://github.com/VaishJadhavVJ", display: "github.com/VaishJadhavVJ" },
+  { label: "LinkedIn", href: "https://linkedin.com/in/vaishnavipjadhav", display: "linkedin.com/in/vaishnavipjadhav" },
+  { label: "Email", href: "mailto:vaishnavipjadhav55@gmail.com", display: "vaishnavipjadhav55@gmail.com" },
+];
+
+const ABOUT =
+  "I'm Vaishnavi Jadhav, an MS Computer Science student at UIC graduating May 2027. I started out at IBM working on mainframe systems, then pivoted into AI/ML. I'm on a research and founder track now, building more than I take courses. Looking for somewhere innovative to work next.";
+
+/**
+ * The darkening layer. Measured: #contact starts 577-607px above the document
+ * bottom across viewports, so full black is reached at 640px to guarantee the
+ * whole section sits on solid black. It is part of the scrolling document rather than pinned to
+ * the viewport, so the scene (which IS pinned) reads through a different part of
+ * the gradient as you scroll. No scroll listener, no layout reads, nothing for the
+ * main thread to do -- the compositor handles it, which is what keeps it smooth on
+ * a phone. Opacity only, no blur.
+ */
+const OVERLAY =
+  "linear-gradient(to bottom," +
+  " rgba(0,0,0,0) 0," +
+  " rgba(0,0,0,0.30) 68vh," +
+  " rgba(0,0,0,0.30) calc(100% - 1150px)," +
+  " rgba(0,0,0,1) calc(100% - 640px)," +
+  " rgba(0,0,0,1) 100%)";
+
+const year = (d: string | null) => (d ? new Date(d).getFullYear() : "");
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="font-mono text-[10px] sm:text-[11px] uppercase tracking-[0.24em] text-[var(--on-dark-muted)]">
+      {children}
+    </p>
+  );
+}
+
+function SectionHead({ eyebrow, title, sprite }: { eyebrow: string; title: string; sprite?: string }) {
+  return (
+    <div className="mb-8 sm:mb-10">
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <div className="mt-3 flex items-center gap-3">
+        {sprite && (
+          <Image
+            src={sprite}
+            alt=""
+            width={48}
+            height={48}
+            unoptimized
+            aria-hidden
+            className="h-9 w-9 shrink-0 sm:h-12 sm:w-12"
+            style={{ imageRendering: "pixelated" }}
+          />
+        )}
+        <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[var(--on-dark)]">{title}</h2>
+      </div>
+      <div className="mt-5 h-px w-full bg-[var(--card-rule)]" />
+    </div>
+  );
+}
+
+/** Every section gets its own dark plate so text clears contrast over the scene. */
+function Card({ id, children }: { id?: string; children: React.ReactNode }) {
+  return (
+    <section
+      id={id}
+      className="relative z-10 mt-14 scroll-mt-24 border border-[var(--card-rule)] bg-[var(--card)] px-5 py-9 sm:mt-20 sm:px-9 sm:py-11"
+    >
+      {children}
+    </section>
+  );
+}
 
 export default async function Lobby() {
   // Fetch from Notion
@@ -14,19 +93,10 @@ export default async function Lobby() {
     getCoursework(),
   ]);
 
-  const notionProjects = projectsRes.status === "fulfilled" ? projectsRes.value : [];
+  const projects = projectsRes.status === "fulfilled" ? projectsRes.value : [];
   const workExperience = workRes.status === "fulfilled" ? workRes.value : [];
   const skills = skillsRes.status === "fulfilled" ? skillsRes.value : [];
   const coursework = courseworkRes.status === "fulfilled" ? courseworkRes.value : [];
-
-  // Fallbacks
-  const projects = notionProjects.length > 0 ? notionProjects : LOBBY_PROJECTS.map(p => ({
-    title: p.title,
-    description: p.desc,
-    tech: [p.tech],
-    date: p.year,
-    link: null
-  }));
 
   // Group skills by category
   const skillsByCategory: Record<string, typeof skills> = {};
@@ -41,165 +111,239 @@ export default async function Lobby() {
     });
   });
 
-  const SOCIAL_LINKS = [
-    { label: "GitHub", href: "https://github.com/VaishJadhavVJ" },
-    { label: "LinkedIn", href: "https://linkedin.com/in/vaishnavipjadhav" },
-    { label: "Email", href: "mailto:vaishjadhav@gmail.com" },
-    { label: "Portfolio", href: "https://heyvaish.dev" },
-  ];
-
   return (
-    <main className="min-h-screen bg-white text-black font-sans selection:bg-black selection:text-white pb-32">
-      
-      {/* 1. HEADER */}
-      <section className="max-w-2xl mx-auto px-6 pt-32 pb-20">
-        <div className="mb-8 text-xs font-mono uppercase tracking-widest text-gray-400">
-          // MS CS @ UIC | Applied AI/ML
-        </div>
-        
-        <h1 className="text-4xl md:text-5xl font-medium leading-[1.15] mb-12 tracking-tight">
-          Hi, I'm Vaishnavi Jadhav.<br/>
-          <span className="text-gray-500 text-3xl md:text-4xl">
-            I build intelligent systems and agentic workflows.
-          </span>
-        </h1>
+    <div className="relative min-h-screen">
 
-        <div className="flex flex-wrap gap-6 text-sm font-medium text-gray-600">
-          {SOCIAL_LINKS.map((link) => (
-            <a 
-              key={link.label} 
-              href={link.href} 
-              target="_blank" 
-              className="hover:text-black transition-colors border-b border-transparent hover:border-black"
-            >
-              {link.label}
-            </a>
-          ))}
-        </div>
-      </section>
+      {/* The courthouse, pinned behind the whole page */}
+      <div className="fixed inset-0 z-0">
+        <HeroMedia />
+      </div>
 
-      {/* 2. THE PORTAL */}
-      <section className="max-w-2xl mx-auto px-6 mb-24">
-        <div className="p-1 border-l-2 border-black pl-6">
-          <p className="text-gray-600 mb-4 italic text-sm">
-            "I don't just write code; I argue for it."
-          </p>
-          <Link 
-            href="/court" 
-            className="inline-flex items-center gap-3 text-sm font-bold bg-black text-white px-5 py-3 hover:bg-red-600 transition-colors"
+      {/* Scroll-coupled darkening (see OVERLAY) */}
+      <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: OVERLAY }} />
+
+      {/* NAVBAR */}
+      <header className="sticky top-0 z-50 border-b border-[var(--card-rule)] bg-black/55">
+        <nav className="mx-auto flex h-14 max-w-[900px] items-center gap-2 px-3 sm:gap-5 sm:px-6">
+          <a href="#top" aria-label="Top" className="shrink-0">
+            <Image
+              src="/ui/ice-smug-32.png"
+              alt=""
+              width={32}
+              height={32}
+              unoptimized
+              priority
+              className="h-8 w-8"
+              style={{ imageRendering: "pixelated" }}
+            />
+          </a>
+
+          <ul className="no-scrollbar flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto font-mono text-[9px] uppercase tracking-[0.1em] text-[var(--on-dark-soft)] sm:gap-6 sm:text-[11px] sm:tracking-[0.18em]">
+            {NAV.map(n => (
+              <li key={n.href}>
+                <a
+                  href={n.href}
+                  className="whitespace-nowrap border-b border-transparent pb-0.5 transition-colors hover:border-[var(--on-dark)] hover:text-[var(--on-dark)]"
+                >
+                  {n.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+
+          <Link
+            href="/court"
+            className="shrink-0 whitespace-nowrap rounded-full bg-[var(--on-dark)] px-2.5 py-1.5 font-medium text-[9px] text-black transition-colors hover:bg-[var(--accent)] hover:text-[var(--on-dark)] sm:px-4 sm:text-xs"
           >
-            <span>my brain is at war →</span>
+            my brain is at war →
           </Link>
+        </nav>
+      </header>
+
+      {/* HERO — no scrim. Text sits directly on the open sky. */}
+      <section id="top" className="relative z-10 h-[62vh] min-h-[380px] w-full sm:h-[70vh] sm:max-h-[660px]">
+        <div className="relative mx-auto flex h-full max-w-[900px] flex-col justify-start px-4 pt-10 sm:px-6 sm:pt-14">
+          <h1 className="hero-crisp rise max-w-[11ch] font-serif text-[clamp(2.4rem,8.5vw,4.6rem)] leading-[0.92] tracking-[-0.02em] text-[var(--ink)] md:text-white">
+            building for the bees
+          </h1>
+          <p
+            className="hero-soft rise mt-5 max-w-[290px] text-[14px] font-semibold leading-relaxed text-[var(--ink)] sm:mt-6 sm:max-w-[360px] sm:text-base md:text-white lg:max-w-[420px]"
+            style={{ animationDelay: "120ms" }}
+          >
+            {"Vaishnavi Jadhav — MS Computer Science @ UIC, Applied AI/ML."}
+          </p>
+          <p
+            className="hero-soft rise mt-1.5 max-w-[290px] text-[14px] font-semibold leading-relaxed text-[var(--ink)] sm:max-w-[360px] sm:text-base md:text-white lg:max-w-[420px]"
+            style={{ animationDelay: "200ms" }}
+          >
+            {"11 shipped projects. Looking for 2027 full-time opportunities."}
+          </p>
         </div>
       </section>
 
-      {/* 3. WORK EXPERIENCE */}
-      {workExperience.length > 0 && (
-        <section className="max-w-2xl mx-auto px-6 mb-24">
-          <h3 className="text-xs font-mono uppercase tracking-widest text-gray-400 mb-10 border-b border-gray-100 pb-4">
-            Work Experience
-          </h3>
-          <div className="space-y-12">
-            {workExperience.map((work, idx) => (
-              <div key={idx} className="group relative pl-4 border-l border-transparent hover:border-gray-200 transition-all">
-                <div className="flex justify-between items-baseline mb-2">
-                  <h4 className="text-lg font-medium">{work.title} <span className="text-gray-500">@ {work.company}</span></h4>
-                  <span className="text-xs font-mono text-gray-400">
-                    {work.startDate ? new Date(work.startDate).getFullYear() : ""} 
-                    {work.endDate ? ` - ${new Date(work.endDate).getFullYear()}` : " - Present"}
+      <main className="relative z-10 mx-auto max-w-[900px] px-4 pb-24 sm:px-6">
+
+        {/* OPENING STATEMENT */}
+        <Card>
+          <SectionHead eyebrow="Opening Statement" title="About" />
+          <p className="max-w-2xl text-[15px] leading-[1.8] text-[var(--on-dark-soft)] sm:text-base">{ABOUT}</p>
+        </Card>
+
+        {/* THE RECORD */}
+        {workExperience.length > 0 && (
+          <Card id="work">
+            <SectionHead eyebrow="The Record" title="Work Experience" sprite="/ui/ice-smug-48.png" />
+            <ol className="divide-y divide-[var(--card-rule)] border-t border-[var(--card-rule)]">
+              {workExperience.map((work, idx) => (
+                <li key={idx} className="grid grid-cols-[1fr_auto] gap-x-6 py-7">
+                  <h3 className="text-[15px] font-medium text-[var(--on-dark)] sm:text-base">
+                    {work.title}
+                    <span className="font-normal text-[var(--on-dark-soft)]">{` @ ${work.company}`}</span>
+                  </h3>
+                  <span className="font-mono text-[11px] tabular-nums text-[var(--on-dark-muted)]">
+                    {`${year(work.startDate)}${work.endDate ? ` — ${year(work.endDate)}` : " — Present"}`}
                   </span>
-                </div>
-                <p className="text-gray-600 leading-relaxed text-sm max-w-lg mb-2 whitespace-pre-wrap">
-                  {work.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+                  {work.description && (
+                    <p className="col-span-2 mt-2 max-w-2xl whitespace-pre-wrap text-sm leading-[1.75] text-[var(--on-dark-soft)]">
+                      {work.description}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
 
-      {/* 4. PROJECTS */}
-      <section className="max-w-2xl mx-auto px-6 mb-24">
-        <h3 className="text-xs font-mono uppercase tracking-widest text-gray-400 mb-10 border-b border-gray-100 pb-4">
-          Selected Works
-        </h3>
-        
-        <div className="space-y-12">
-          {projects.map((project, idx) => (
-            <div key={idx} className="group relative pl-4 border-l border-transparent hover:border-gray-200 transition-all">
-              <div className="flex justify-between items-baseline mb-2">
-                {project.link ? (
-                  <a href={project.link} target="_blank" className="text-lg font-medium group-hover:text-blue-600 transition-colors">
-                    {project.title} ↗
-                  </a>
-                ) : (
-                  <h4 className="text-lg font-medium group-hover:text-blue-600 transition-colors">
-                    {project.title}
-                  </h4>
-                )}
-                <span className="text-xs font-mono text-gray-400">
-                  {project.date ? new Date(project.date).getFullYear() : ""}
-                </span>
-              </div>
-              <p className="text-gray-600 leading-relaxed text-sm max-w-lg mb-2">
-                {project.description}
-              </p>
-              {project.tech && project.tech.length > 0 && (
-                <p className="text-xs font-mono text-gray-400">
-                  {project.tech.join(", ")}
-                </p>
-              )}
+        {/* EXHIBITS */}
+        {projects.length > 0 && (
+          <Card id="projects">
+            <SectionHead eyebrow="Exhibits" title="Projects" />
+            <ol className="divide-y divide-[var(--card-rule)] border-t border-[var(--card-rule)]">
+              {projects.map((project, idx) => (
+                <li key={idx} className="group grid grid-cols-[auto_1fr_auto] gap-x-4 py-7 sm:gap-x-6">
+                  <span className="pt-0.5 font-mono text-[11px] tabular-nums text-[var(--on-dark-muted)]">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <h3 className="min-w-0 text-[15px] font-medium text-[var(--on-dark)] sm:text-base">
+                    {project.link ? (
+                      <a
+                        href={project.link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="border-b border-[var(--card-rule)] transition-colors hover:border-[var(--on-dark)]"
+                      >
+                        {project.title}
+                        <span className="text-[var(--on-dark-muted)]"> ↗</span>
+                      </a>
+                    ) : (
+                      project.title
+                    )}
+                  </h3>
+                  <span className="pt-0.5 font-mono text-[11px] tabular-nums text-[var(--on-dark-muted)]">
+                    {year(project.date)}
+                  </span>
+                  <div className="col-start-2 col-end-4">
+                    {project.description && (
+                      <p className="mt-2 max-w-2xl text-sm leading-[1.75] text-[var(--on-dark-soft)]">
+                        {project.description}
+                      </p>
+                    )}
+                    {project.tech && project.tech.length > 0 && (
+                      <p className="mt-2.5 font-mono text-[11px] leading-relaxed text-[var(--on-dark-muted)]">
+                        {project.tech.join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
+
+        {/* CREDENTIALS */}
+        {Object.keys(skillsByCategory).length > 0 && (
+          <Card id="skills">
+            <SectionHead eyebrow="Credentials" title="Skills" sprite="/ui/child-confused-48.png" />
+            <div className="space-y-8">
+              {Object.entries(skillsByCategory).map(([category, catSkills]) => (
+                <div key={category} className="grid gap-3 sm:grid-cols-[180px_1fr] sm:gap-6">
+                  <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--on-dark-muted)] sm:pt-1.5">
+                    {category}
+                  </h3>
+                  <ul className="flex flex-wrap gap-x-2 gap-y-2">
+                    {catSkills.map(skill => (
+                      <li
+                        key={skill.name}
+                        className="rounded-full border border-[var(--card-rule)] bg-white/[0.04] px-3 py-1 text-[13px] text-[var(--on-dark-soft)]"
+                      >
+                        {skill.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </Card>
+        )}
 
-      {/* 5. SKILLS */}
-      {Object.keys(skillsByCategory).length > 0 && (
-        <section className="max-w-2xl mx-auto px-6 mb-24">
-          <h3 className="text-xs font-mono uppercase tracking-widest text-gray-400 mb-10 border-b border-gray-100 pb-4">
-            Technical Skills
-          </h3>
-          <div className="space-y-8">
-            {Object.entries(skillsByCategory).map(([category, catSkills]) => (
-              <div key={category}>
-                <h4 className="text-sm font-medium mb-3 text-gray-800">{category}</h4>
-                <div className="flex flex-wrap gap-2">
-                  {catSkills.map(skill => (
-                    <span key={skill.name} className="px-3 py-1 bg-gray-100 text-xs text-gray-700 rounded-full">
-                      {skill.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
+        {/* CASE HISTORY */}
+        {coursework.length > 0 && (
+          <Card id="coursework">
+            <SectionHead eyebrow="Case History" title="Coursework" sprite="/ui/child-amazed-48.png" />
+            <ol className="divide-y divide-[var(--card-rule)] border-t border-[var(--card-rule)]">
+              {coursework.map((course, idx) => (
+                <li key={idx} className="grid grid-cols-[1fr_auto] gap-x-6 py-6">
+                  <h3 className="text-[15px] font-medium text-[var(--on-dark)] sm:text-base">{course.name}</h3>
+                  <span className="font-mono text-[11px] tabular-nums text-[var(--on-dark-muted)]">
+                    {course.termYear.join(", ")}
+                  </span>
+                  <p className="col-span-2 mt-1 text-[13px] text-[var(--on-dark-muted)]">{course.institution}</p>
+                  {course.description && (
+                    <p className="col-span-2 mt-2 max-w-2xl text-sm leading-[1.75] text-[var(--on-dark-soft)]">
+                      {course.description}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </Card>
+        )}
+
+        {/* CLOSING ARGUMENT — sits on solid black by here */}
+        <Card id="contact">
+          <SectionHead eyebrow="Closing Argument" title="Contact" />
+          <ul className="divide-y divide-[var(--card-rule)] border-t border-[var(--card-rule)]">
+            {LINKS.map(link => (
+              <li key={link.label}>
+                <a
+                  href={link.href}
+                  target={link.href.startsWith("mailto:") ? undefined : "_blank"}
+                  rel="noreferrer"
+                  className="group grid grid-cols-[110px_1fr_auto] items-baseline gap-4 py-5 text-[var(--on-dark)] transition-colors hover:text-[var(--accent)]"
+                >
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--on-dark-muted)]">
+                    {link.label}
+                  </span>
+                  <span className="min-w-0 truncate text-[15px] sm:text-base">{link.display}</span>
+                  <span className="text-[var(--on-dark-muted)] transition-transform group-hover:translate-x-0.5">↗</span>
+                </a>
+              </li>
             ))}
-          </div>
-        </section>
-      )}
+          </ul>
+        </Card>
 
-      {/* 6. COURSEWORK */}
-      {coursework.length > 0 && (
-        <section className="max-w-2xl mx-auto px-6 mb-24">
-          <h3 className="text-xs font-mono uppercase tracking-widest text-gray-400 mb-10 border-b border-gray-100 pb-4">
-            Relevant Coursework
-          </h3>
-          <div className="space-y-6">
-            {coursework.map((course, idx) => (
-              <div key={idx} className="pl-4 border-l border-gray-100">
-                <div className="flex justify-between items-baseline mb-1">
-                  <h4 className="text-sm font-medium">{course.name}</h4>
-                  <span className="text-xs font-mono text-gray-400">{course.termYear.join(", ")}</span>
-                </div>
-                <p className="text-gray-500 text-xs mb-1">{course.institution}</p>
-                <p className="text-gray-600 text-xs max-w-lg">
-                  {course.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-    </main>
+        <footer className="relative z-10 mt-16 flex items-center justify-between border-t border-[var(--card-rule)] pt-6">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--on-dark-muted)]">
+            Vaishnavi Jadhav · 2026
+          </p>
+          <Link
+            href="/court"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--on-dark-muted)] transition-colors hover:text-[var(--accent)]"
+          >
+            my brain is at war →
+          </Link>
+        </footer>
+      </main>
+    </div>
   );
 }

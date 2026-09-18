@@ -3,13 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* The case file: warm paper, charcoal ink. The courtroom is its dark twin. */
+  --paper: #f2f0eb;
+  --ink: #23231f;
+  --ink-soft: #55534b;
+  --ink-muted: #8a877c;
+  --rule: #dcd8ce;
+  --accent: #b23a2e;
+
+  /* Dark surface set, used once the courthouse scene became the page background. */
+  --on-dark: #f4f2ed;
+  --on-dark-soft: #d8d3c6;
+  --on-dark-muted: #ada695;
+  --card: rgba(0, 0, 0, 0.82);
+  --card-rule: rgba(244, 242, 237, 0.14);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 /* Custom Utilities for Pixel Art & Retro Vibes */
 @layer utilities {
+  /* Nav links scroll rather than collide with the CTA below ~375px. */
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
   .pixel-corners {
     clip-path: polygon(
       0px 4px, 4px 4px, 4px 0px, 
@@ -22,7 +41,59 @@
 
 /* The Defaults */
 body {
-  color: black;
-  background: white;
+  color: var(--paper);
+  background: #000;
   font-family: var(--font-geist-sans), Arial, sans-serif; /* Force the font here */
+}
+
+/* Paper tooth. Fixed so it reads as stock, not as a scrolling texture. */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
+}
+
+/* Hero legibility.
+   Below 768px the hero is the STATIC WebP -- nothing moves, the tuned crop puts
+   charcoal on clear sky, and measurement showed 0% of edge pixels under 4.5. A
+   shadow there solves a problem that does not exist, so there is none.
+   From 768px the video plays and leaves sweep the sky: white text, with a
+   zero-blur ring on the display line (blur cannot hold alpha 1px out) and a
+   softer drop on the sublines, where that ring reads as emboldened at 16px. */
+.hero-crisp,
+.hero-soft {
+  text-shadow: none;
+}
+
+@media (min-width: 768px) {
+  .hero-crisp {
+    text-shadow:
+      1px 0 0 #000, -1px 0 0 #000, 0 1px 0 #000, 0 -1px 0 #000,
+      1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000,
+      0 1px 3px rgba(0, 0, 0, 0.75);
+  }
+  .hero-soft {
+    text-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.80),
+      0 0 3px rgba(0, 0, 0, 0.70),
+      0 0 6px rgba(0, 0, 0, 0.50);
+  }
+}
+
+/* One orchestrated page-load stagger. CSS only, so the page stays a server component. */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+.rise {
+  animation: riseIn 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .rise { animation: none; }
 }

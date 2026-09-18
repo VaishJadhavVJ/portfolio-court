@@ -189,6 +189,68 @@ function clearEnclosedBackground(
   return cleared;
 }
 
+/**
+ * Panel bleed. The sheet is divided into equal-width panels, but a raised arm or
+ * a swirl can cross that line, so a slice picks up a fragment of its neighbour.
+ *
+ * Testing "does this component touch a panel edge" is NOT enough -- baka's sweat
+ * drops and narrator's swirls touch an edge while lying wholly inside their own
+ * panel, and an edge rule deletes them. Instead every connected component is
+ * attributed to the panel holding most of its pixels; pixels sitting in any
+ * other panel are the leak and are turned back into background.
+ *
+ * Returns [strippedPixels, leakCount].
+ */
+function stripForeignPanels(
+  data: Buffer, W: number, H: number, C: number, bg: Uint8Array, edges: number[], names: string[]
+): [number, number] {
+  const n = names.length;
+  const panelOf = (x: number) => {
+    for (let i = 0; i < n; i++) if (x >= edges[i] && x < edges[i + 1]) return i;
+    return n - 1;
+  };
+
+  const label = new Int32Array(W * H).fill(-1);
+  const stack = new Int32Array(W * H);
+  const perPanel: number[][] = [];
+
+  for (let start = 0; start < W * H; start++) {
+    if (label[start] !== -1 || bg[start]) continue;
+    const id = perPanel.length;
+    const counts = new Array(n).fill(0);
+    let sp = 0;
+    label[start] = id;
+    stack[sp++] = start;
+    while (sp > 0) {
+      const q = stack[--sp];
+      const x = q % W, y = (q / W) | 0;
+      counts[panelOf(x)]++;
+      const push = (nx: number, ny: number) => {
+        const np = ny * W + nx;
+        if (label[np] !== -1 || bg[np]) return;
+        label[np] = id;
+        stack[sp++] = np;
+      };
+      if (x > 0) push(x - 1, y);
+      if (x < W - 1) push(x + 1, y);
+      if (y > 0) push(x, y - 1);
+      if (y < H - 1) push(x, y + 1);
+    }
+    perPanel.push(counts);
+  }
+
+  const home = perPanel.map((c) => c.indexOf(Math.max(...c)));
+  let stripped = 0, leaks = 0;
+  perPanel.forEach((c, i) => { leaks += c.filter((v, j) => v > 0 && j !== home[i]).length; });
+
+  for (let p = 0; p < W * H; p++) {
+    const id = label[p];
+    if (id < 0) continue;
+    if (home[id] !== panelOf(p % W)) { bg[p] = 1; stripped++; }
+  }
+  return [stripped, leaks];
+}
+
 interface Written {
   name: string;
   width: number;
@@ -217,14 +279,19 @@ async function sliceSheet(sheetPath: string, names: string[], outDir: string): P
     (clearedEnclosed ? `  (+${clearedEnclosed} px of enclosed background reclassified)` : '')
   );
 
-  // Apply hard alpha into the working buffer.
-  for (let p = 0; p < W * H; p++) data[p * C + 3] = bg[p] ? 0 : 255;
-
   if (W % n !== 0) console.warn(`  note: width ${W} not divisible by ${n}; panel edges rounded to whole pixels`);
   const edges = Array.from({ length: n + 1 }, (_, i) => Math.round((i * W) / n));
 
+  const [strippedPx, leakCount] = stripForeignPanels(data, W, H, C, bg, edges, names);
+  if (leakCount) {
+    console.log(`  ${leakCount} cross-boundary leak(s) stripped (${strippedPx} px of neighbouring art)`);
+  }
+
   // Per-panel tight horizontal bounds; vertical bounds shared across the sheet
   // so the character keeps its footing between expressions.
+  // Apply hard alpha into the working buffer, after bleed has been stripped.
+  for (let p = 0; p < W * H; p++) data[p * C + 3] = bg[p] ? 0 : 255;
+
   const boxes = names.map((name, i) => {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let y = 0; y < H; y++)
