@@ -12,7 +12,7 @@ export function assertPlayable(
   // existsSync returns false on ANY error -- including EMFILE after a long run
   // has exhausted file descriptors -- which silently reports every sprite as
   // missing. readdirSync throws instead, so a real problem looks like one.
-  const available = new Set(fs.readdirSync(spriteDir).filter((f) => f.endsWith('.png')));
+  const available = new Set(fs.readdirSync(spriteDir).filter((f) => f.endsWith('.webp')));
   if (!available.size) throw new Error(`no sprites found in ${spriteDir}`);
 
   const failures: string[] = [];
@@ -27,7 +27,7 @@ export function assertPlayable(
       if (typeof line.text !== 'string' || !line.text.trim()) {
         failures.push(`${where}: empty text`);
       }
-      const sprite = `${line.speaker}-${line.emotion}.png`;
+      const sprite = `${line.speaker}-${line.emotion}.webp`;
       if (!available.has(sprite)) {
         failures.push(`${where}: no art for this emotion -> public/agents/${sprite}`);
       }

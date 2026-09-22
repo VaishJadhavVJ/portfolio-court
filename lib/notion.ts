@@ -52,79 +52,58 @@ const getUrl = (prop: any) => prop?.url || null;
 const getFileUrl = (prop: any) => prop?.files?.[0]?.file?.url || prop?.files?.[0]?.external?.url || null;
 const getSelect = (prop: any) => prop?.select?.name || null;
 
-export async function getProjects(): Promise<Project[]> {
-  try {
-    const response = await notion().databases.query({
-      database_id: PROJECTS_DB,
-      filter: { property: "Published", checkbox: { equals: true } },
-    });
+// Every fetch is allowed to throw. That is deliberate, not an oversight: the
+// landing page is ISR, and when a regeneration throws Next keeps serving the
+// last good page. These used to catch and return [], which turned an expired
+// token into a *successful* regeneration of an empty page that ISR then cached
+// over the good one -- the whole portfolio vanished and nothing surfaced.
+async function queryPublished(databaseId: string) {
+  const response = await notion().databases.query({
+    database_id: databaseId,
+    filter: { property: "Published", checkbox: { equals: true } },
+  });
+  return response.results;
+}
 
-    return response.results.map((page: any) => ({
-      title: getTitle(page.properties.Name),
-      description: getText(page.properties.Description),
-      tech: getMultiSelect(page.properties.Technologies),
-      date: getDate(page.properties.Date),
-      link: getUrl(page.properties.Link),
-      image: getFileUrl(page.properties.Image),
-    }));
-  } catch (error) {
-    console.error("Error fetching projects from Notion", error);
-    return [];
+export async function getProjects(): Promise<Project[]> {
+  const results = await queryPublished(PROJECTS_DB);
+  // Zero published projects is never a real state for this portfolio; treat it
+  // as a failure so ISR keeps the last good page instead of caching a hole.
+  if (!results.length) {
+    throw new Error("Notion returned 0 published projects -- refusing to render an empty portfolio");
   }
+  return results.map((page: any) => ({
+    title: getTitle(page.properties.Name),
+    description: getText(page.properties.Description),
+    tech: getMultiSelect(page.properties.Technologies),
+    date: getDate(page.properties.Date),
+    link: getUrl(page.properties.Link),
+    image: getFileUrl(page.properties.Image),
+  }));
 }
 
 export async function getWorkExperience(): Promise<WorkExperience[]> {
-  try {
-    const response = await notion().databases.query({
-      database_id: WORK_DB,
-      filter: { property: "Published", checkbox: { equals: true } },
-    });
-
-    return response.results.map((page: any) => ({
-      title: getTitle(page.properties.Title),
-      company: getText(page.properties.Company),
-      description: getText(page.properties.Description),
-      startDate: getDate(page.properties["Start Date"]),
-      endDate: getDate(page.properties["End Date"]),
-    }));
-  } catch (error) {
-    console.error("Error fetching work experience from Notion", error);
-    return [];
-  }
+  return (await queryPublished(WORK_DB)).map((page: any) => ({
+    title: getTitle(page.properties.Title),
+    company: getText(page.properties.Company),
+    description: getText(page.properties.Description),
+    startDate: getDate(page.properties["Start Date"]),
+    endDate: getDate(page.properties["End Date"]),
+  }));
 }
 
 export async function getSkills(): Promise<Skill[]> {
-  try {
-    const response = await notion().databases.query({
-      database_id: SKILLS_DB,
-      filter: { property: "Published", checkbox: { equals: true } },
-    });
-
-    return response.results.map((page: any) => ({
-      name: getTitle(page.properties.Name),
-      category: getMultiSelect(page.properties.Category),
-    }));
-  } catch (error) {
-    console.error("Error fetching skills from Notion", error);
-    return [];
-  }
+  return (await queryPublished(SKILLS_DB)).map((page: any) => ({
+    name: getTitle(page.properties.Name),
+    category: getMultiSelect(page.properties.Category),
+  }));
 }
 
 export async function getCoursework(): Promise<Coursework[]> {
-  try {
-    const response = await notion().databases.query({
-      database_id: COURSEWORK_DB,
-      filter: { property: "Published", checkbox: { equals: true } },
-    });
-
-    return response.results.map((page: any) => ({
-      name: getTitle(page.properties["Course Name"]),
-      institution: getSelect(page.properties.Institution),
-      termYear: getMultiSelect(page.properties["Term / Year"]),
-      description: getText(page.properties["Brief Description"]),
-    }));
-  } catch (error) {
-    console.error("Error fetching coursework from Notion", error);
-    return [];
-  }
+  return (await queryPublished(COURSEWORK_DB)).map((page: any) => ({
+    name: getTitle(page.properties["Course Name"]),
+    institution: getSelect(page.properties.Institution),
+    termYear: getMultiSelect(page.properties["Term / Year"]),
+    description: getText(page.properties["Brief Description"]),
+  }));
 }

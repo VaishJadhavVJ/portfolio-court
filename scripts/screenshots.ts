@@ -4,6 +4,7 @@
  *
  * Usage: npx tsx scripts/screenshots.ts [baseUrl]
  * Writes screenshots/<page>-<width>.png and fails (exit 1) on any 404, console
+ * warning,
  * error, page-level scrolling, or dialogue text overflowing its fixed box.
  */
 import { chromium, type ConsoleMessage, type Request } from 'playwright';
@@ -43,7 +44,11 @@ async function main() {
       const errors: string[] = [];
       p.on('requestfailed', (r: Request) => failed.push(`${r.url()} (${r.failure()?.errorText})`));
       p.on('response', (r) => { if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`); });
-      p.on('console', (m: ConsoleMessage) => { if (m.type() === 'error') errors.push(m.text()); });
+      // Warnings count too. Counting only errors let ~47 AudioContext warnings per
+      // courtroom load pass this harness unnoticed.
+      p.on('console', (m: ConsoleMessage) => {
+        if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`);
+      });
 
       await p.goto(BASE + page.path, { waitUntil: 'networkidle' });
       await p.waitForTimeout(600);
@@ -66,7 +71,8 @@ async function main() {
         // Play a debate to the last line first. A build that renders line 1 but
         // cannot advance used to pass every check here; it never clicked.
         const topics: string[] = await p.$$eval('select option', (os) => os.map((o) => (o as HTMLOptionElement).value));
-        const sample = topics.slice(0, 3);
+        // Every debate, not a sample: a broken topic only fails when it is played.
+        const sample = topics;
         for (const topic of sample) {
           const r = await playDebate(p, topic);
           if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" stuck at line ${r.stuckAt}/${r.total}`);
@@ -117,11 +123,11 @@ async function main() {
       if (page.fullscreen && vScroll > 0) problems.push(`${page.name}@${vp.label}: page scrolls vertically by ${vScroll}px`);
       if (hScroll > 0) problems.push(`${page.name}@${vp.label}: page scrolls horizontally by ${hScroll}px`);
       failed.forEach((f) => problems.push(`${page.name}@${vp.label}: request failed ${f}`));
-      errors.forEach((e) => problems.push(`${page.name}@${vp.label}: console error ${e}`));
+      errors.forEach((e) => problems.push(`${page.name}@${vp.label}: console ${e}`));
 
       console.log(
         `${(page.name + '@' + vp.label).padEnd(14)} ${shot.padEnd(30)} ` +
-        `vscroll=${vScroll}px hscroll=${hScroll}px reqfail=${failed.length} err=${errors.length}${note}`
+        `vscroll=${vScroll}px hscroll=${hScroll}px reqfail=${failed.length} console=${errors.length}${note}`
       );
       await ctx.close();
     }
@@ -134,7 +140,7 @@ async function main() {
     problems.forEach((p) => console.error('  - ' + p));
     process.exit(1);
   }
-  console.log('\nAll viewports clean: no scrolling, no failed requests, no console errors, no text overflow.');
+  console.log('\nAll viewports clean: no scrolling, no failed requests, no console errors or warnings, no text overflow.');
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

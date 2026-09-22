@@ -89,17 +89,14 @@ function Card({ id, children }: { id?: string; children: React.ReactNode }) {
 
 export default async function Lobby() {
   // Fetch from Notion
-  const [projectsRes, workRes, skillsRes, courseworkRes] = await Promise.allSettled([
+  // Promise.all, not allSettled: any failure must fail the render so ISR keeps
+  // serving the last good page rather than caching one with sections missing.
+  const [projects, workExperience, skills, coursework] = await Promise.all([
     getProjects(),
     getWorkExperience(),
     getSkills(),
     getCoursework(),
   ]);
-
-  const projects = projectsRes.status === "fulfilled" ? projectsRes.value : [];
-  const workExperience = workRes.status === "fulfilled" ? workRes.value : [];
-  const skills = skillsRes.status === "fulfilled" ? skillsRes.value : [];
-  const coursework = courseworkRes.status === "fulfilled" ? courseworkRes.value : [];
 
   // Group skills by category
   const skillsByCategory: Record<string, typeof skills> = {};

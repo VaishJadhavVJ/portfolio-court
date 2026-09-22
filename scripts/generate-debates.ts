@@ -20,12 +20,6 @@ async function main() {
   const [projects, work, skills, coursework] = await Promise.all([
     getProjects(), getWorkExperience(), getSkills(), getCoursework()
   ]);
-  // Notion's helpers swallow errors and return [] -- an auth failure looks
-  // identical to an empty database. Without this guard the agents would debate
-  // a blank portfolio and the output would still pass assertPlayable.
-  if (!projects.length) {
-    throw new Error('Notion returned 0 projects. Check NOTION_TOKEN and database sharing; refusing to generate debates from an empty portfolio.');
-  }
   console.log(`Loaded ${projects.length} projects, ${work.length} work, ${skills.length} skills, ${coursework.length} coursework.`);
 
   const portfolioData = { projects, work, skills, coursework };

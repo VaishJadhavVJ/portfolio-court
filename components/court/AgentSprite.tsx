@@ -15,15 +15,20 @@ const SPRITE: Record<AgentName, Partial<Record<Emotion, string>> & { default: st
     // Each agent's own vocabulary passes through; the cross-vocabulary entries
     // stay as a safety net for any line still speaking baka's old emotion set.
     baka:  { point: "point", nervous: "nervous", happy: "happy", shocked: "shocked", default: "point" },
-    ice:   { neutral: "neutral", smug: "smug", angry: "angry", shocked: "shocked",
+    // ice-angry and child-sleep were never used by any debate and their art was
+    // removed from public/ (sources stay in art/sheets). Without an entry they
+    // fall back to the agent's default rather than requesting a missing file.
+    ice:   { neutral: "neutral", smug: "smug", shocked: "shocked",
              point: "smug", nervous: "neutral", happy: "smug", default: "neutral" },
-    child: { confused: "confused", amazed: "amazed", sleep: "sleep", annoyed: "annoyed",
+    child: { confused: "confused", amazed: "amazed", annoyed: "annoyed",
              point: "confused", nervous: "confused", happy: "amazed", default: "confused" },
+    // Not wired to any agent, and its art is no longer in public/ (source in
+    // art/sheets). Kept only because AgentName still includes it.
     narrator: { idle: "idle", point: "point", default: "idle" },
 };
 
 export default function AgentSprite({ agent, emotion}: Props){
-    const src = `/agents/${agent}-${SPRITE[agent][emotion] ?? SPRITE[agent].default}.png`;
+    const src = `/agents/${agent}-${SPRITE[agent][emotion] ?? SPRITE[agent].default}.webp`;
     return(
         <div className="relative w-full h-full">
             <AnimatePresence mode="wait">

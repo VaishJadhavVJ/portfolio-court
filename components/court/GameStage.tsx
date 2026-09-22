@@ -1,10 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
-import useSound from "use-sound";
 import AgentSprite from "./AgentSprite";
+import CourtAudio, { type CourtAudioHandle } from "./CourtAudio";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { AgentName, DialogueLine, Emotion } from "@/types/court";
 import debatesDataRaw from "@/data/debates.json";
@@ -18,6 +17,13 @@ const BACKGROUNDS: Record<AgentName, string> = {
   child: "/backgrounds/court-judge.webp",
   narrator: "/backgrounds/court-judge.webp",
 };
+
+/**
+ * Phones get a 960x540 cut of each courtroom: the stage is ~500 CSS px tall
+ * there, so the 1920x1080 desktop file was 4x the pixels anyone could see and
+ * ~1.4 MB each. Served through <picture>, so only the matching file downloads.
+ */
+const mobileBg = (src: string) => src.replace(/\.webp$/, "-mobile.webp");
 
 /** Sprite height as a share of the stage, so every character reads the same size. */
 const SPRITE_STAGE_SHARE = "66%";
@@ -58,13 +64,18 @@ export default function GameStage() {
     setStaged(v);
   };
 
-  // Sound hooks
-  const [playObjection] = useSound("/sounds/objection.mp3", { volume: 0.7 });
-  const [playHoldIt] = useSound("/sounds/holdit.mp3", { volume: 0.7 });
-  const [playTakeThat] = useSound("/sounds/takethat.mp3", { volume: 0.7 });
-  const [playDeskSlam] = useSound("/sounds/deskslam.mp3", { volume: 0.8 });
-  const [playTextBlip] = useSound("/sounds/blipmale.mp3", { volume: 0.3 });
-  const [playThinking, { stop: stopThinking }] = useSound("/sounds/thinking.mp3", { volume: 0.4, loop: true });
+  // Sound is only mounted after the first click or key press (see CourtAudio).
+  const audioRef = useRef<CourtAudioHandle>(null);
+  const [audioOn, setAudioOn] = useState(false);
+  useEffect(() => {
+    const unlock = () => setAudioOn(true);
+    window.addEventListener("click", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
 
   // Refs for sound triggers
   const prevIndexRef = useRef(-1);
@@ -74,16 +85,6 @@ export default function GameStage() {
 
   // The custom hook handles the typing effect
   const { displayedText, isComplete, skip } = useTypewriter(currentLine?.text || "", 12);
-
-  // Play thinking sound when no dialogue is available, stop when it appears
-  useEffect(() => {
-    if (!currentLine) {
-      playThinking();
-    } else {
-      stopThinking();
-    }
-    return () => stopThinking();
-  }, [currentLine, playThinking, stopThinking]);
 
   // Trigger sounds when a new dialogue line starts
   useEffect(() => {
@@ -96,18 +97,18 @@ export default function GameStage() {
     // Keyword-triggered sounds
     const text = currentLine.text.toUpperCase();
     if (currentLine.speaker === "baka" && text.includes("OBJECTION")) {
-      playObjection();
+      audioRef.current?.objection();
     } else if (currentLine.speaker === "child" && text.includes("HOLD IT")) {
-      playHoldIt();
+      audioRef.current?.holdIt();
     } else if (currentLine.speaker === "ice" && text.includes("TAKE THAT")) {
-      playTakeThat();
+      audioRef.current?.takeThat();
     }
 
     // Emotion-triggered sounds
     if (currentLine.emotion === "point") {
-      playDeskSlam();
+      audioRef.current?.deskSlam();
     }
-  }, [index, currentLine, playObjection, playHoldIt, playTakeThat, playDeskSlam]);
+  }, [index, currentLine]);
 
   // Text blip sound (throttled — every 3rd character)
   useEffect(() => {
@@ -115,9 +116,9 @@ export default function GameStage() {
 
     blipCounterRef.current++;
     if (blipCounterRef.current % 3 === 0) {
-      playTextBlip();
+      audioRef.current?.blip();
     }
-  }, [displayedText, currentLine, isComplete, playTextBlip]);
+  }, [displayedText, currentLine, isComplete]);
 
   // Speaker-change choreography. Same speaker twice in a row is not a
   // transition at all -- the sprite just swaps emotion in place.
@@ -210,6 +211,7 @@ export default function GameStage() {
     return (
       <div className="relative min-h-screen bg-[#202020] text-white font-mono flex items-center justify-center">
         <p className="text-red-500">No dialogue available. Please generate debates.</p>
+        {audioOn && <CourtAudio ref={audioRef} thinking />}
         <Link href="/" className="ml-4 px-4 py-2 bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners">
           [ ESCAPE ]
         </Link>
@@ -219,6 +221,8 @@ export default function GameStage() {
 
   return (
     <div className="fixed inset-0 h-[100dvh] w-full bg-[#202020] text-white font-mono overflow-hidden flex flex-col">
+
+      {audioOn && <CourtAudio ref={audioRef} thinking={false} />}
 
       {/* 1. CRT SCANLINE EFFECT (Overlay) */}
       <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
@@ -268,17 +272,19 @@ export default function GameStage() {
             exit={{ opacity: 0 }}
             transition={{ duration: BG_MS / 1000, ease: "easeInOut" }}
           >
-            <Image
-              src={stagedBg}
-              alt=""
-              fill
-              priority
-              unoptimized
-              // object-cover crops to fill instead of stretching the aspect ratio.
-              className="object-cover object-center"
-              style={{ imageRendering: "pixelated" }}
-              onError={() => setMissingBackground(stagedBg)}
-            />
+            <picture>
+              <source media="(max-width: 767px)" srcSet={mobileBg(stagedBg)} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={stagedBg}
+                alt=""
+                fetchPriority="high"
+                // object-cover crops to fill instead of stretching the aspect ratio.
+                className="absolute inset-0 h-full w-full object-cover object-center"
+                style={{ imageRendering: "pixelated" }}
+                onError={(e) => setMissingBackground(e.currentTarget.currentSrc || stagedBg)}
+              />
+            </picture>
           </motion.div>
         </AnimatePresence>
 
