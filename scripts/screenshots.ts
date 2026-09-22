@@ -10,7 +10,7 @@
 import { chromium, type ConsoleMessage, type Request } from 'playwright';
 import * as fs from 'fs';
 import debatesRaw from '../data/debates.json';
-import { playDebate } from './play-debate';
+import { playDebate, playIntro } from './play-debate';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
 const OUT = 'screenshots';
@@ -81,12 +81,26 @@ async function main() {
         // Every debate, not a sample: a broken topic only fails when it is played.
         const sample = topics;
         let ended = 0;
+        let first = true;
         for (const topic of sample) {
           const r = await playDebate(p, topic);
           if (r.ok) ended++;
+          // Fresh context = first visit: the intro must play, all of it.
+          if (first && r.introLines < 6) problems.push(`${page.name}@${vp.label}: first visit showed ${r.introLines} intro lines, expected 6`);
+          if (first) note += `  intro ${r.introLines} lines |`;
+          first = false;
           if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" ${r.problem}`);
         }
         note += `  ${ended}/${sample.length} debates reached the end card`;
+
+        // The end card's REPLAY INTRO must bring the intro back and hand over again.
+        if (await p.isVisible('[data-testid="end-replay-intro"]')) {
+          await p.click('[data-testid="end-replay-intro"]');
+          await p.waitForTimeout(300);
+          const again = await playIntro(p);
+          if (again < 6) problems.push(`${page.name}@${vp.label}: REPLAY INTRO played ${again} lines, expected 6`);
+          else note += ` | replay intro ok`;
+        }
         // Not networkidle: on a reload, Next re-sends its route prefetches and the
         // duplicates hold their response open for ~30s before aborting.
         await p.reload({ waitUntil: 'load' });
@@ -94,6 +108,10 @@ async function main() {
         const begin = await p.waitForSelector('[data-testid="begin"]', { timeout: 5000 }).catch(() => null);
         if (begin) await begin.click();
         else problems.push(`${page.name}@${vp.label}: no begin screen`);
+        // Returning visitor (the intro flag is now saved): straight to the debate.
+        await p.waitForTimeout(1600);
+        if (await p.isVisible('[data-testid="skip-intro"]')) problems.push(`${page.name}@${vp.label}: intro replayed for a returning visitor`);
+        else note += ` | returning visit skips intro`;
         await p.waitForTimeout(1200);
         await p.screenshot({ path: shot });
 

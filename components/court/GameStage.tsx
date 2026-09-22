@@ -35,6 +35,17 @@ const BG_MS = 260;
 const IN_MS = 220;
 
 const MUTE_KEY = "court-muted";
+const INTRO_KEY = "court-intro-seen";
+
+/** First-visit opening, played in the dialogue box before the first debate. */
+const INTRO: DialogueLine[] = [
+  { id: 1, speaker: "baka", emotion: "happy", text: "OH!! A VISITOR!! Welcome to court! If this feels like Ace Attorney crashed into Kaguya-sama: Love is War... YES. That was the whole plan." },
+  { id: 2, speaker: "ice", emotion: "smug", text: "... Allow me. None of us are real people. We're the three voices in Vaishnavi's head. She simply gave the argument a courtroom." },
+  { id: 3, speaker: "baka", emotion: "point", text: "I'm THE BUILDER! I ask ONE question: DID IT SHIP?! Deployed means defended. OBJECTION to everything else!!" },
+  { id: 4, speaker: "ice", emotion: "neutral", text: "The Strategist. I ask whether it matters... who it serves, where it leads, what it's worth in five years." },
+  { id: 5, speaker: "child", emotion: "confused", text: "HOLD IT!! I'm the Contrarian. They ask if it works. I ask why it EXISTS. Has anyone checked? ...No? Cool. Cool cool cool." },
+  { id: 6, speaker: "child", emotion: "amazed", text: "Her projects are on trial and we never agree. Court is now in session!!" },
+];
 
 const linesFor = (topic: string) => (debatesData[topic] ?? []).filter((l) => l.text.trim());
 
@@ -92,7 +103,11 @@ export default function GameStage() {
   const [audioReady, setAudioReady] = useState(false);
   const [audioTimedOut, setAudioTimedOut] = useState(false);
   const onAudioReady = useCallback(() => setAudioReady(true), []);
+  const [inIntro, setInIntro] = useState(false);
   const begin = () => {
+    let seen = false;
+    try { seen = localStorage.getItem(INTRO_KEY) === "1"; } catch { /* storage blocked: play the intro */ }
+    setInIntro(!seen);
     setAudioOn(true);
     setBegun(true);
   };
@@ -114,7 +129,8 @@ export default function GameStage() {
   const prevIndexRef = useRef(-1);
   const blipCounterRef = useRef(0);
 
-  const currentLine = script[index] || null;
+  const lines = inIntro ? INTRO : script;
+  const currentLine = lines[index] || null;
 
   // The custom hook handles the typing effect
   const { displayedText, isComplete, skip } = useTypewriter(live ? currentLine?.text || "" : "", 12);
@@ -212,7 +228,28 @@ export default function GameStage() {
     };
   }, [currentLine, spriteControls]);
 
+  const toDebate = () => {
+    try { localStorage.setItem(INTRO_KEY, "1"); } catch { /* not persisted; intro plays again next visit */ }
+    setInIntro(false);
+    setIndex(0);
+    setEnded(false);
+    prevIndexRef.current = -1;
+    dialogueRef.current?.focus();
+  };
+
+  const replayIntro = () => {
+    setInIntro(true);
+    setIndex(0);
+    setEnded(false);
+    prevIndexRef.current = -1;
+    dialogueRef.current?.focus();
+  };
+
   const handleTopicChange = (topic: string) => {
+    if (inIntro) {
+      try { localStorage.setItem(INTRO_KEY, "1"); } catch { /* see toDebate */ }
+      setInIntro(false);
+    }
     setSelectedTopic(topic);
     setScript(linesFor(topic));
     setIndex(0);
@@ -239,7 +276,8 @@ export default function GameStage() {
     // Ignore advances mid-choreography so sequences cannot overlap.
     if (transitioning) return;
 
-    if (index < script.length - 1) setIndex(index + 1);
+    if (index < lines.length - 1) setIndex(index + 1);
+    else if (inIntro) toDebate();
     else setEnded(true);
   };
 
@@ -371,6 +409,14 @@ export default function GameStage() {
                 >
                   [ REPLAY ]
                 </button>
+                <button
+                  type="button"
+                  onClick={replayIntro}
+                  data-testid="end-replay-intro"
+                  className="h-11 px-3 border-2 border-green-500 text-xs hover:bg-green-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200"
+                >
+                  [ REPLAY INTRO ]
+                </button>
                 <Link
                   href="/"
                   data-testid="end-exit"
@@ -444,7 +490,17 @@ export default function GameStage() {
       </div>
 
       {/* 4. THE DIALOGUE BOX — pinned to the bottom, fixed height, never scrolls */}
-      <div className="shrink-0 w-[95vw] max-w-[1300px] mx-auto z-40 pb-3 sm:pb-4">
+      <div className="relative shrink-0 w-[95vw] max-w-[1300px] mx-auto z-40 pb-3 sm:pb-4">
+        {inIntro && (
+          <button
+            type="button"
+            onClick={toDebate}
+            data-testid="skip-intro"
+            className="absolute bottom-full right-0 mb-2 h-11 px-3 border-2 border-green-500 bg-black text-green-400 text-xs font-mono hover:bg-green-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200"
+          >
+            [ SKIP INTRO ]
+          </button>
+        )}
         <button
           type="button"
           ref={dialogueRef}
@@ -483,7 +539,7 @@ export default function GameStage() {
 
         <div className="text-center mt-1 text-[10px] sm:text-xs text-gray-400">
           [ CLICK TO {isComplete ? "CONTINUE" : "SKIP"} ] &nbsp;·&nbsp;{" "}
-          <span data-testid="line-counter">{index + 1}/{script.length}</span>
+          {inIntro && "INTRO "}<span data-testid="line-counter">{index + 1}/{lines.length}</span>
         </div>
       </div>
       </main>

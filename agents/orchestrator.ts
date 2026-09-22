@@ -2,6 +2,15 @@ import { builderAgent } from './builder';
 import { strategistAgent } from './strategist';
 import { contrarianAgent } from './contrarian';
 import { AgentName, DialogueLine, Emotion } from '@/types/court';
+import type { Project, WorkExperience, Skill, Coursework } from '@/lib/notion';
+
+/** What scripts/generate-debates.ts fetches from Notion. Sections may be absent. */
+export interface PortfolioData {
+  projects?: Project[];
+  work?: WorkExperience[];
+  skills?: Skill[];
+  coursework?: Coursework[];
+}
 
 const ROSTER = [
   { speaker: 'baka' as const, label: 'Builder', agent: builderAgent },
@@ -24,7 +33,7 @@ const ROUND_BEATS: Record<number, string> = {
 
 const norm = (text: string) => text.trim().toLowerCase();
 
-export const runDebate = async (topic: string, portfolioData: any): Promise<DialogueLine[]> => {
+export const runDebate = async (topic: string, portfolioData: PortfolioData): Promise<DialogueLine[]> => {
   let transcriptStr = '';
   const transcript: DialogueLine[] = [];
   let id = 1;
@@ -80,7 +89,7 @@ export const runDebate = async (topic: string, portfolioData: any): Promise<Dial
   return transcript;
 };
 
-function formatPortfolioForAgents(data: any): string {
+function formatPortfolioForAgents(data: PortfolioData): string {
   let result = "PROJECTS:\n";
   if (data.projects) {
     for (const p of data.projects) {

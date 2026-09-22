@@ -1,5 +1,6 @@
 /**
- * Walks a debate from line 1 to the end card by clicking the dialogue box.
+ * Walks a debate from line 1 to the end card by clicking the dialogue box,
+ * playing through the first-visit intro first if it appears.
  * Shared by the screenshot harness so a build that renders the first line but
  * cannot advance, or that loops back to line 1 instead of ending, can never
  * pass again.
@@ -12,17 +13,39 @@ export interface PlayResult {
   total: number;
   ok: boolean;
   problem?: string;
+  /** Intro lines clicked through before the debate (0 = no intro shown). */
+  introLines: number;
 }
 
 const BEGIN = '[data-testid="begin"]';
 const BOX = '[data-testid="dialogue-box"]';
 const END = '[data-testid="end-card"]';
+const SKIP = '[data-testid="skip-intro"]';
+
+/** Clicks through the intro until it hands over to the debate. Returns lines seen, or -1 if it never ends. */
+export async function playIntro(page: Page): Promise<number> {
+  if (!(await page.isVisible(SKIP))) return 0;
+  let seen = 0;
+  for (let i = 0; i < 40; i++) {
+    if (!(await page.isVisible(SKIP))) return seen;
+    const t = (await page.textContent('[data-testid="line-counter"]')) ?? '';
+    seen = Math.max(seen, Number(t.split('/')[0]));
+    await page.click(BOX);
+    await page.waitForTimeout(150);
+  }
+  return -1;
+}
 
 export async function playDebate(page: Page, topic?: string): Promise<PlayResult> {
   // Every visit opens on the begin screen; it only needs pressing once per load.
   if (await page.isVisible(BEGIN)) {
     await page.click(BEGIN);
     await page.waitForSelector(BEGIN, { state: 'detached' });
+    await page.waitForTimeout(1600); // audio warm-up before line 1
+  }
+  const introLines = await playIntro(page);
+  if (introLines < 0) {
+    return { topic: topic ?? '', reached: 0, total: 0, ok: false, problem: 'intro never handed over to the debate', introLines };
   }
   if (topic) {
     await page.selectOption('select', topic);
@@ -39,7 +62,7 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
   const start = await read();
   let index = start.index;
   const total = start.total;
-  const fail = (problem: string): PlayResult => ({ topic: selected, reached: index, total, ok: false, problem });
+  const fail = (problem: string): PlayResult => ({ topic: selected, reached: index, total, ok: false, problem, introLines });
 
   // Target total + 1 is the end card. Each step may need two clicks: one to
   // skip the typewriter, one to advance.
@@ -67,5 +90,5 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
   await page.waitForTimeout(150);
   if ((await read()).index !== total) return fail('advanced past the end card');
 
-  return { topic: selected, reached: index, total, ok: true };
+  return { topic: selected, reached: index, total, ok: true, introLines };
 }
