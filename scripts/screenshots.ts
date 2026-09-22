@@ -42,7 +42,14 @@ async function main() {
 
       const failed: string[] = [];
       const errors: string[] = [];
-      p.on('requestfailed', (r: Request) => failed.push(`${r.url()} (${r.failure()?.errorText})`));
+      p.on('requestfailed', (r: Request) => {
+        const err = r.failure()?.errorText ?? '';
+        // Next aborts its own speculative route prefetches (?_rsc=...) when they
+        // are superseded. In production those show up as net::ERR_ABORTED; they
+        // are not broken requests.
+        if (err === 'net::ERR_ABORTED' && new URL(r.url()).searchParams.has('_rsc')) return;
+        failed.push(`${r.url()} (${err})`);
+      });
       p.on('response', (r) => { if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`); });
       // Warnings count too. Counting only errors let ~47 AudioContext warnings per
       // courtroom load pass this harness unnoticed.
@@ -73,20 +80,28 @@ async function main() {
         const topics: string[] = await p.$$eval('select option', (os) => os.map((o) => (o as HTMLOptionElement).value));
         // Every debate, not a sample: a broken topic only fails when it is played.
         const sample = topics;
+        let ended = 0;
         for (const topic of sample) {
           const r = await playDebate(p, topic);
-          if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" stuck at line ${r.stuckAt}/${r.total}`);
+          if (r.ok) ended++;
+          if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" ${r.problem}`);
         }
-        note += `  played ${sample.length} debates to the end`;
-        await p.reload({ waitUntil: 'networkidle' });
-        await p.waitForTimeout(400);
+        note += `  ${ended}/${sample.length} debates reached the end card`;
+        // Not networkidle: on a reload, Next re-sends its route prefetches and the
+        // duplicates hold their response open for ~30s before aborting.
+        await p.reload({ waitUntil: 'load' });
+        // Every visit must open on the begin screen (it is what unlocks audio).
+        const begin = await p.waitForSelector('[data-testid="begin"]', { timeout: 5000 }).catch(() => null);
+        if (begin) await begin.click();
+        else problems.push(`${page.name}@${vp.label}: no begin screen`);
+        await p.waitForTimeout(1200);
         await p.screenshot({ path: shot });
 
         // Does any line in the whole dataset overflow the fixed-height box?
         const overflow = await p.evaluate((texts: string[]) => {
           const box = document.querySelector('[data-testid="dialogue-text"]') as HTMLElement | null;
-          if (!box) return { missing: true, worst: 0, count: 0, sample: '' };
-          const para = box.querySelector('p') as HTMLElement;
+          const para = box?.querySelector('[data-testid="dialogue-line"]') as HTMLElement | null;
+          if (!box || !para) return { missing: true, worst: 0, count: 0, sample: '' };
           const original = para.textContent ?? '';
           let worst = 0, count = 0, sample = '';
           for (const t of texts) {
@@ -109,13 +124,13 @@ async function main() {
         // Top bar must not overlap on narrow screens.
         const bar = await p.evaluate(() => {
           const sel = document.querySelector('select')?.getBoundingClientRect();
-          const esc = document.querySelector('a[href="/"]')?.getBoundingClientRect();
+          const esc = document.querySelector('[data-testid="mute-toggle"]')?.getBoundingClientRect();
           if (!sel || !esc) return null;
           return { gap: Math.round(esc.left - sel.right), selH: Math.round(sel.height), escH: Math.round(esc.height) };
         });
         if (bar) {
           if (bar.gap < 0) problems.push(`${page.name}@${vp.label}: top bar overlaps by ${-bar.gap}px`);
-          if (bar.selH < 40 || bar.escH < 40) problems.push(`${page.name}@${vp.label}: tap targets under 40px (select ${bar.selH}, escape ${bar.escH})`);
+          if (bar.selH < 40 || bar.escH < 40) problems.push(`${page.name}@${vp.label}: tap targets under 40px (select ${bar.selH}, mute ${bar.escH})`);
           note += `  | topbar gap ${bar.gap}px, targets ${bar.selH}/${bar.escH}px`;
         }
       }

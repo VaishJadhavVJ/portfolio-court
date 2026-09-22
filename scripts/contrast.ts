@@ -28,7 +28,7 @@ const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b
 
 async function collect(page: Page): Promise<Run[]> {
   return page.evaluate(() => {
-    const out: any[] = [];
+    const out: Run[] = [];
     let id = 0;
     document.querySelectorAll<HTMLElement>('body *').forEach((el) => {
       const own = Array.from(el.childNodes).some((n) => n.nodeType === 3 && (n.textContent ?? '').trim().length > 1);

@@ -1,7 +1,9 @@
 /**
- * One-off: slice horizontal character sheets into individual sprite PNGs.
+ * Slices horizontal character sheets into the sprites the site serves:
+ * 500px-tall lossless WebP, one per deployed expression.
  *
- * Usage:  npx tsx scripts/slice-sprites.ts <sheets-folder> [out-folder]
+ * Usage:  npx tsx scripts/slice-sprites.ts art/sheets [out-folder]
+ *         (pass public/agents as out-folder to replace the deployed sprites)
  *
  * Handles sheets whose "transparent" background is really a checkerboard
  * pattern baked into opaque pixels. The checkerboard is keyed out by a
@@ -23,6 +25,11 @@ const SHEETS: { file: string; names: string[] }[] = [
   // NOTE: this sheet has 2 panels, not 4. Add names here if that changes.
   { file: 'narrator-sheet.png', names: ['narrator-idle', 'narrator-point'] },
 ];
+
+/** Panels that are sliced (they shape the shared crop) but not written: unused by the site. */
+const NOT_DEPLOYED = new Set(['child-sleep', 'ice-angry', 'narrator-idle', 'narrator-point']);
+/** ~500px tall is the largest the stage renders a sprite. */
+const OUT_HEIGHT = 500;
 
 /** Per-channel tolerance when matching a pixel to a checkerboard colour. */
 const TOLERANCE = 12;
@@ -309,6 +316,7 @@ async function sliceSheet(sheetPath: string, names: string[], outDir: string): P
   const written: Written[] = [];
 
   for (let i = 0; i < n; i++) {
+    if (NOT_DEPLOYED.has(names[i])) continue;
     const b = boxes[i];
     const left = b.minX;
     const pw = b.maxX - b.minX + 1;
@@ -337,17 +345,21 @@ async function sliceSheet(sheetPath: string, names: string[], outDir: string): P
     }
     const charBoxTransparentPct = charBoxArea ? (charBoxTransparent / charBoxArea) * 100 : 0;
 
-    // extract() is a pure crop: it copies pixels and never resamples. Nothing in
-    // this pipeline resizes, blurs or flattens. If a resize is ever added it MUST
-    // pass { kernel: 'nearest' } or it will smear the pixel art.
-    const outPath = path.join(outDir, `${names[i]}.png`);
-    await sharp(data, { raw: { width: W, height: H, channels: 4 } })
+    // Crop first (a pure pixel copy), then scale to the served height. The
+    // resize MUST stay kernel 'nearest': anything else smears the pixel art.
+    // Lossless WebP, so the served pixels are exactly these.
+    const crop = await sharp(data, { raw: { width: W, height: H, channels: 4 } })
       .extract({ left, top, width: pw, height: ph })
-      .png({ compressionLevel: 9 })
+      .png()
+      .toBuffer();
+    const outPath = path.join(outDir, `${names[i]}.webp`);
+    await sharp(crop)
+      .resize({ height: OUT_HEIGHT, kernel: 'nearest' })
+      .webp({ lossless: true, effort: 6 })
       .toFile(outPath);
 
     written.push({
-      name: `${names[i]}.png`,
+      name: `${names[i]}.webp`,
       width: pw,
       height: ph,
       transparentPct: (transparentPixels / (pw * ph)) * 100,
@@ -367,9 +379,6 @@ async function main() {
     process.exit(1);
   }
   if (!fs.existsSync(sheetDir)) throw new Error(`sheets folder not found: ${sheetDir}`);
-  if (path.resolve(outDir) === path.resolve('public/agents')) {
-    throw new Error('refusing to write into public/agents -- pass a temp folder and move the files yourself');
-  }
   fs.mkdirSync(outDir, { recursive: true });
 
   const all: Written[] = [];

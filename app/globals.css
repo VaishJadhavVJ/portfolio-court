@@ -3,12 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* The case file: warm paper, charcoal ink. The courtroom is its dark twin. */
-  --paper: #f2f0eb;
-  --ink: #23231f;
-  --ink-soft: #55534b;
-  --ink-muted: #8a877c;
-  --rule: #dcd8ce;
+  --paper: #f2f0eb; /* body text colour */
   --accent: #b23a2e;
 
   /* Dark surface set, used once the courthouse scene became the page background. */
@@ -26,8 +21,6 @@ html {
 /* Custom Utilities for Pixel Art & Retro Vibes */
 @layer utilities {
   /* Nav links scroll rather than collide with the CTA below ~375px. */
-  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
 
   .pixel-corners {
     clip-path: polygon(
@@ -46,16 +39,6 @@ body {
   font-family: var(--font-geist-sans), Arial, sans-serif; /* Force the font here */
 }
 
-/* Paper tooth. Fixed so it reads as stock, not as a scrolling texture. */
-.grain::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.16;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
-}
 
 /* Hero geometry, shared with the scroll overlay so the darkening ramp can be
    placed strictly AFTER the hero ends. The hero must show the scene at full

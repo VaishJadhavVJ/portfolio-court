@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getProjects, getWorkExperience, getSkills, getCoursework } from "@/lib/notion";
-import HeroMedia from "@/components/HeroMedia";
+import HeroMedia, { HeroVideoToggle } from "@/components/HeroMedia";
 
 export const revalidate = 60; // Revalidate every 60 seconds (optional, but good for CMS)
 
@@ -41,7 +41,11 @@ const OVERLAY =
 
 const RESUME = "/Vaishnavi_Jadhav_resume_FTE.pdf";
 
-const year = (d: string | null) => (d ? new Date(d).getFullYear() : "");
+// Notion dates are ISO strings ("2024-01-01"). Read the year straight off the
+// string: new Date() parses a bare date as UTC midnight and getFullYear() then
+// reads it in the server's timezone, so a Jan 1 date rendered a year early
+// anywhere west of UTC.
+const year = (d: string | null) => (d ? d.slice(0, 4) : "");
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
@@ -124,7 +128,9 @@ export default async function Lobby() {
 
       {/* NAVBAR — light bar, black type, no blur */}
       <header className="sticky top-0 z-50 border-b border-black/10 bg-[#f7f6f2]">
-        <nav className="mx-auto flex h-14 max-w-[900px] items-center gap-2 px-3 sm:gap-5 sm:px-6">
+        {/* Under 400px the links take a second row: on one row the CTA pushed
+            Contact out of view at 320px. */}
+        <nav className="mx-auto flex max-w-[900px] flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 min-[400px]:h-14 min-[400px]:flex-nowrap min-[400px]:py-0 sm:gap-5 sm:px-6">
           <a href="#top" aria-label="Top" className="shrink-0">
             <Image
               src="/ui/ice-smug-32.png"
@@ -138,7 +144,7 @@ export default async function Lobby() {
             />
           </a>
 
-          <ul className="no-scrollbar flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto font-mono text-[9px] uppercase tracking-[0.1em] text-black sm:gap-6 sm:text-[11px] sm:tracking-[0.18em]">
+          <ul className="order-last flex basis-full flex-wrap items-center gap-x-4 gap-y-1 py-1 font-mono min-[400px]:order-none min-[400px]:min-w-0 min-[400px]:flex-1 min-[400px]:basis-auto min-[400px]:gap-2.5 min-[400px]:py-0 text-[9px] uppercase tracking-[0.1em] text-black sm:gap-6 sm:text-[11px] sm:tracking-[0.18em]">
             {NAV.map(n => (
               <li key={n.href}>
                 <a
@@ -153,7 +159,7 @@ export default async function Lobby() {
 
           <Link
             href="/court"
-            className="shrink-0 whitespace-nowrap rounded-full bg-black px-2.5 py-1.5 font-medium text-[9px] text-white transition-colors hover:bg-[var(--accent)] sm:px-4 sm:text-xs"
+            className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-black px-2.5 py-1.5 font-medium text-[9px] text-white transition-colors hover:bg-[var(--accent)] sm:px-4 sm:text-xs"
           >
             my brain is at war →
           </Link>
@@ -196,6 +202,7 @@ export default async function Lobby() {
             </a>
           </div>
         </div>
+        <HeroVideoToggle />
       </section>
 
       <main className="relative z-10 mx-auto max-w-[900px] px-4 pb-24 sm:px-6">

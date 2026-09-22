@@ -12,5 +12,4 @@ export interface DialogueLine {
     speaker: AgentName;
     emotion: Emotion;
     text: string;
-    action?: 'shake' | 'flash';
 }

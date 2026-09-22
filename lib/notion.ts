@@ -1,4 +1,5 @@
-import { Client } from "@notionhq/client";
+import { Client, isFullPage } from "@notionhq/client";
+import type { PageObjectResponse } from "@notionhq/client/build/src/api-endpoints";
 
 // ponytail: built on first call, not at import time. Import statements hoist
 // above dotenv.config(), so a module-level client reads NOTION_TOKEN before
@@ -43,14 +44,20 @@ export interface Coursework {
   description: string;
 }
 
-// Helper functions for safe extraction
-const getText = (prop: any) => prop?.rich_text?.[0]?.plain_text || "";
-const getTitle = (prop: any) => prop?.title?.[0]?.plain_text || "";
-const getMultiSelect = (prop: any) => prop?.multi_select?.map((s: any) => s.name) || [];
-const getDate = (prop: any) => prop?.date?.start || null;
-const getUrl = (prop: any) => prop?.url || null;
-const getFileUrl = (prop: any) => prop?.files?.[0]?.file?.url || prop?.files?.[0]?.external?.url || null;
-const getSelect = (prop: any) => prop?.select?.name || null;
+// Property extractors. Each narrows on the property's declared type, so a
+// renamed or retyped Notion column reads as empty instead of throwing.
+type Prop = PageObjectResponse["properties"][string] | undefined;
+const getText = (p: Prop) => (p?.type === "rich_text" && p.rich_text[0]?.plain_text) || "";
+const getTitle = (p: Prop) => (p?.type === "title" && p.title[0]?.plain_text) || "";
+const getMultiSelect = (p: Prop) => (p?.type === "multi_select" ? p.multi_select.map((s) => s.name) : []);
+const getDate = (p: Prop) => (p?.type === "date" && p.date?.start) || null;
+const getUrl = (p: Prop) => (p?.type === "url" && p.url) || null;
+const getFileUrl = (p: Prop) => {
+  const f = p?.type === "files" ? p.files[0] : undefined;
+  if (!f) return null;
+  return ("file" in f ? f.file.url : f.external.url) || null;
+};
+const getSelect = (p: Prop) => (p?.type === "select" && p.select?.name) || null;
 
 // Every fetch is allowed to throw. That is deliberate, not an oversight: the
 // landing page is ISR, and when a regeneration throws Next keeps serving the
@@ -62,7 +69,7 @@ async function queryPublished(databaseId: string) {
     database_id: databaseId,
     filter: { property: "Published", checkbox: { equals: true } },
   });
-  return response.results;
+  return response.results.filter(isFullPage);
 }
 
 export async function getProjects(): Promise<Project[]> {
@@ -72,7 +79,7 @@ export async function getProjects(): Promise<Project[]> {
   if (!results.length) {
     throw new Error("Notion returned 0 published projects -- refusing to render an empty portfolio");
   }
-  return results.map((page: any) => ({
+  return results.map((page) => ({
     title: getTitle(page.properties.Name),
     description: getText(page.properties.Description),
     tech: getMultiSelect(page.properties.Technologies),
@@ -83,7 +90,7 @@ export async function getProjects(): Promise<Project[]> {
 }
 
 export async function getWorkExperience(): Promise<WorkExperience[]> {
-  return (await queryPublished(WORK_DB)).map((page: any) => ({
+  return (await queryPublished(WORK_DB)).map((page) => ({
     title: getTitle(page.properties.Title),
     company: getText(page.properties.Company),
     description: getText(page.properties.Description),
@@ -93,14 +100,14 @@ export async function getWorkExperience(): Promise<WorkExperience[]> {
 }
 
 export async function getSkills(): Promise<Skill[]> {
-  return (await queryPublished(SKILLS_DB)).map((page: any) => ({
+  return (await queryPublished(SKILLS_DB)).map((page) => ({
     name: getTitle(page.properties.Name),
     category: getMultiSelect(page.properties.Category),
   }));
 }
 
 export async function getCoursework(): Promise<Coursework[]> {
-  return (await queryPublished(COURSEWORK_DB)).map((page: any) => ({
+  return (await queryPublished(COURSEWORK_DB)).map((page) => ({
     name: getTitle(page.properties["Course Name"]),
     institution: getSelect(page.properties.Institution),
     termYear: getMultiSelect(page.properties["Term / Year"]),

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import AgentSprite from "./AgentSprite";
@@ -34,6 +34,8 @@ const OUT_MS = 180;
 const BG_MS = 260;
 const IN_MS = 220;
 
+const MUTE_KEY = "court-muted";
+
 const linesFor = (topic: string) => (debatesData[topic] ?? []).filter((l) => l.text.trim());
 
 export default function GameStage() {
@@ -67,15 +69,46 @@ export default function GameStage() {
   // Sound is only mounted after the first click or key press (see CourtAudio).
   const audioRef = useRef<CourtAudioHandle>(null);
   const [audioOn, setAudioOn] = useState(false);
+
+  // Mute is remembered across visits. Read after mount so the server render and
+  // the first client render agree.
+  const [muted, setMuted] = useState(false);
   useEffect(() => {
-    const unlock = () => setAudioOn(true);
-    window.addEventListener("click", unlock, { once: true });
-    window.addEventListener("keydown", unlock, { once: true });
-    return () => {
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("keydown", unlock);
-    };
+    try { setMuted(localStorage.getItem(MUTE_KEY) === "1"); } catch { /* storage blocked: default to sound on */ }
   }, []);
+  const toggleMute = () => {
+    setMuted((m) => {
+      try { localStorage.setItem(MUTE_KEY, m ? "0" : "1"); } catch { /* not persisted; still toggles */ }
+      return !m;
+    });
+  };
+  const dialogueRef = useRef<HTMLButtonElement>(null);
+
+  // Every visit opens on a single "begin" press. Browsers only allow audio after
+  // a gesture, so that press mounts CourtAudio, and the debate waits until the
+  // sounds are ready -- otherwise line 1 types in silence. If audio never comes
+  // up (blocked, offline), the debate starts anyway after a short wait.
+  const [begun, setBegun] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
+  const [audioTimedOut, setAudioTimedOut] = useState(false);
+  const onAudioReady = useCallback(() => setAudioReady(true), []);
+  const begin = () => {
+    setAudioOn(true);
+    setBegun(true);
+  };
+  useEffect(() => {
+    if (!begun) return;
+    const t = setTimeout(() => setAudioTimedOut(true), 1500);
+    return () => clearTimeout(t);
+  }, [begun]);
+  const live = begun && (audioReady || audioTimedOut);
+
+  // After the last line: an end card instead of looping back to line 1.
+  const [ended, setEnded] = useState(false);
+  const replayRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (ended) replayRef.current?.focus();
+  }, [ended]);
 
   // Refs for sound triggers
   const prevIndexRef = useRef(-1);
@@ -84,11 +117,11 @@ export default function GameStage() {
   const currentLine = script[index] || null;
 
   // The custom hook handles the typing effect
-  const { displayedText, isComplete, skip } = useTypewriter(currentLine?.text || "", 12);
+  const { displayedText, isComplete, skip } = useTypewriter(live ? currentLine?.text || "" : "", 12);
 
   // Trigger sounds when a new dialogue line starts
   useEffect(() => {
-    if (!currentLine || prevIndexRef.current === index) return;
+    if (!live || !currentLine || prevIndexRef.current === index) return;
     prevIndexRef.current = index;
 
     // Reset blip counter on new line
@@ -108,17 +141,17 @@ export default function GameStage() {
     if (currentLine.emotion === "point") {
       audioRef.current?.deskSlam();
     }
-  }, [index, currentLine]);
+  }, [live, index, currentLine]);
 
   // Text blip sound (throttled — every 3rd character)
   useEffect(() => {
-    if (!currentLine || displayedText.length === 0 || isComplete) return;
+    if (!live || !currentLine || displayedText.length === 0 || isComplete) return;
 
     blipCounterRef.current++;
     if (blipCounterRef.current % 3 === 0) {
       audioRef.current?.blip();
     }
-  }, [displayedText, currentLine, isComplete]);
+  }, [live, displayedText, currentLine, isComplete]);
 
   // Speaker-change choreography. Same speaker twice in a row is not a
   // transition at all -- the sprite just swaps emotion in place.
@@ -177,18 +210,25 @@ export default function GameStage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLine, spriteControls]);
 
   const handleTopicChange = (topic: string) => {
     setSelectedTopic(topic);
     setScript(linesFor(topic));
     setIndex(0);
+    setEnded(false);
     prevIndexRef.current = -1;
   };
 
+  const replay = () => {
+    setIndex(0);
+    setEnded(false);
+    prevIndexRef.current = -1;
+    dialogueRef.current?.focus();
+  };
+
   const handleNext = () => {
-    if (!currentLine) return;
+    if (!live || ended || !currentLine) return;
 
     // A click on a still-typing line completes it instantly.
     if (!isComplete) {
@@ -199,19 +239,38 @@ export default function GameStage() {
     // Ignore advances mid-choreography so sequences cannot overlap.
     if (transitioning) return;
 
-    if (index < script.length - 1) {
-      setIndex(index + 1);
-    } else {
-      // Loop back to start for testing
-      setIndex(0);
-    }
+    if (index < script.length - 1) setIndex(index + 1);
+    else setEnded(true);
   };
+
+  // Keyboard. Focused on the dialogue button, Enter and Space already click it;
+  // ArrowRight is added there too. With nothing focused, all three advance, so
+  // a keyboard user never has to tab in first. Anywhere else (the topic select,
+  // mute, ESCAPE) the keys keep their native meaning.
+  const nextRef = useRef(handleNext);
+  nextRef.current = handleNext;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = document.activeElement;
+      const onNothing = !el || el === document.body;
+      const onDialogue = el === dialogueRef.current;
+      const advance =
+        (e.key === "ArrowRight" && (onNothing || onDialogue)) ||
+        ((e.key === "Enter" || e.key === " ") && onNothing);
+      if (!advance) return;
+      e.preventDefault();
+      nextRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   if (!currentLine || !staged) {
     return (
       <div className="relative min-h-screen bg-[#202020] text-white font-mono flex items-center justify-center">
         <p className="text-red-500">No dialogue available. Please generate debates.</p>
-        {audioOn && <CourtAudio ref={audioRef} thinking />}
+        {audioOn && <CourtAudio ref={audioRef} thinking muted={muted} />}
         <Link href="/" className="ml-4 px-4 py-2 bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners">
           [ ESCAPE ]
         </Link>
@@ -222,7 +281,7 @@ export default function GameStage() {
   return (
     <div className="fixed inset-0 h-[100dvh] w-full bg-[#202020] text-white font-mono overflow-hidden flex flex-col">
 
-      {audioOn && <CourtAudio ref={audioRef} thinking={false} />}
+      {audioOn && <CourtAudio ref={audioRef} thinking={false} muted={muted} onReady={onAudioReady} />}
 
       {/* 1. CRT SCANLINE EFFECT (Overlay) */}
       <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
@@ -239,10 +298,10 @@ export default function GameStage() {
       )}
 
       {/* 2. TOP BAR — one row, 44px tap targets, select takes the slack */}
-      <div className="shrink-0 w-full px-3 py-2 sm:px-4 sm:py-3 z-40 flex items-center gap-2 sm:gap-4">
+      <header className="shrink-0 w-full px-3 py-2 sm:px-4 sm:py-3 z-40 flex items-center gap-2 sm:gap-4">
         <span className="hidden md:inline text-xs text-green-500 shrink-0">SYS.2026.LOGS</span>
         <select
-          className="flex-1 min-w-0 h-11 bg-black border-2 border-green-500 text-green-400 text-xs px-2 outline-none font-mono rounded-none"
+          className="flex-1 min-w-0 h-11 bg-black border-2 border-green-500 text-green-400 text-xs px-2 outline-none font-mono rounded-none focus-visible:border-green-200 focus-visible:ring-2 focus-visible:ring-green-200"
           value={selectedTopic}
           onChange={(e) => handleTopicChange(e.target.value)}
           aria-label="Debate topic"
@@ -251,13 +310,92 @@ export default function GameStage() {
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={toggleMute}
+          aria-pressed={muted}
+          data-testid="mute-toggle"
+          className={`shrink-0 h-11 px-3 border-2 border-green-500 text-xs font-mono whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 ${
+            muted ? "bg-green-500 text-black" : "bg-black text-green-400 hover:bg-green-950"
+          }`}
+        >
+          {muted ? "[ MUTED ]" : "[ MUTE ]"}
+        </button>
+        {/* pixel-corners clips anything drawn outside the box, so the focus ring is inset */}
         <Link
           href="/"
-          className="shrink-0 h-11 px-4 flex items-center justify-center bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners whitespace-nowrap"
+          className="shrink-0 h-11 px-4 flex items-center justify-center bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners whitespace-nowrap focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white"
         >
           [ ESCAPE ]
         </Link>
-      </div>
+      </header>
+
+      <main className="relative flex flex-1 min-h-0 flex-col">
+        <h1 className="sr-only">Courtroom: {selectedTopic}</h1>
+        {/* Screen readers get each whole line once, not the typewriter's letters. */}
+        <p className="sr-only" aria-live="polite">
+          {live && !ended ? `${currentLine.speaker}: ${currentLine.text}` : ""}
+        </p>
+
+        {!begun && (
+          <div className="absolute inset-0 z-[45] flex items-center justify-center bg-black/80 p-4">
+            <button
+              type="button"
+              onClick={begin}
+              autoFocus
+              data-testid="begin"
+              className="border-4 border-green-500 bg-black px-6 py-5 text-sm sm:text-base text-green-400 tracking-widest hover:bg-green-950 focus-visible:outline-none focus-visible:border-green-200 focus-visible:ring-4 focus-visible:ring-green-300/70"
+            >
+              &gt; COURT IS IN SESSION
+              <span className="mt-3 block text-xs text-green-300 animate-pulse">[ PRESS TO BEGIN ]</span>
+            </button>
+          </div>
+        )}
+
+        {ended && (
+          <section
+            aria-labelledby="end-card-title"
+            data-testid="end-card"
+            className="absolute inset-0 z-[45] flex items-center justify-center bg-black/85 p-3 sm:p-6"
+          >
+            <div className="flex max-h-full w-full max-w-xl flex-col border-4 border-green-500 bg-black p-4 sm:p-6 text-green-400 shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)]">
+              <h2 id="end-card-title" className="text-sm sm:text-base tracking-widest">&gt; COURT ADJOURNED</h2>
+              <p className="mt-1 text-xs text-green-300">&gt; {selectedTopic}: {script.length} lines, no verdict.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  ref={replayRef}
+                  onClick={replay}
+                  data-testid="end-replay"
+                  className="h-11 px-3 border-2 border-green-500 text-xs hover:bg-green-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200"
+                >
+                  [ REPLAY ]
+                </button>
+                <Link
+                  href="/"
+                  data-testid="end-exit"
+                  className="h-11 px-3 flex items-center border-2 border-red-500 text-xs text-red-300 hover:bg-red-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
+                >
+                  [ EXIT ]
+                </Link>
+              </div>
+              <p className="mt-5 text-xs text-green-300">&gt; OR PICK ANOTHER CASE:</p>
+              <ul className="mt-2 min-h-0 overflow-y-auto">
+                {topics.filter((t) => t !== selectedTopic).map((t) => (
+                  <li key={t}>
+                    <button
+                      type="button"
+                      onClick={() => { handleTopicChange(t); dialogueRef.current?.focus(); }}
+                      className="w-full py-2 text-left text-xs sm:text-sm hover:text-green-200 hover:bg-green-950 focus-visible:outline-none focus-visible:bg-green-950 focus-visible:text-green-200"
+                    >
+                      &gt; {t}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
 
       {/* 3. THE STAGE — fills everything above the dialogue box */}
       <div className="relative flex-1 min-h-0 w-full overflow-hidden">
@@ -274,7 +412,6 @@ export default function GameStage() {
           >
             <picture>
               <source media="(max-width: 767px)" srcSet={mobileBg(stagedBg)} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={stagedBg}
                 alt=""
@@ -308,40 +445,48 @@ export default function GameStage() {
 
       {/* 4. THE DIALOGUE BOX — pinned to the bottom, fixed height, never scrolls */}
       <div className="shrink-0 w-[95vw] max-w-[1300px] mx-auto z-40 pb-3 sm:pb-4">
-        <div
+        <button
+          type="button"
+          ref={dialogueRef}
           onClick={handleNext}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight") { e.preventDefault(); handleNext(); }
+          }}
+          aria-label={isComplete ? "Next line" : "Show the whole line"}
           data-testid="dialogue-box"
-          className="bg-black/95 border-4 border-white relative cursor-pointer hover:border-green-400 transition-colors shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)]"
+          className="block w-full text-left bg-black/95 border-4 border-white relative cursor-pointer hover:border-green-400 transition-colors shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)] focus-visible:outline-none focus-visible:border-green-300 focus-visible:ring-4 focus-visible:ring-green-300/70"
         >
           {/* Speaker nameplate, flush into the top-left corner of the box */}
-          <div className="absolute top-0 left-0 bg-blue-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm font-bold capitalize tracking-wider border-r-2 border-b-2 border-white z-10">
+          <span aria-hidden className="absolute top-0 left-0 bg-blue-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm font-bold capitalize tracking-wider border-r-2 border-b-2 border-white z-10">
             {staged.speaker}
-          </div>
+          </span>
 
           {/* Fixed height, sized for the longest line in the data at each breakpoint. */}
-          <div
+          <span
+            aria-hidden
             data-testid="dialogue-text"
-            className="h-[272px] min-[375px]:h-[232px] sm:h-[184px] md:h-[208px] lg:h-[160px] overflow-hidden px-3 sm:px-5 pt-9 sm:pt-10 pb-3 sm:pb-4"
+            className="block h-[272px] min-[375px]:h-[232px] sm:h-[184px] md:h-[208px] lg:h-[160px] overflow-hidden px-3 sm:px-5 pt-9 sm:pt-10 pb-3 sm:pb-4"
           >
-            <p className="text-left text-xs sm:text-sm md:text-base leading-relaxed tracking-wide text-gray-100">
+            <span data-testid="dialogue-line" className="block text-left text-xs sm:text-sm md:text-base leading-relaxed tracking-wide text-gray-100">
               {displayedText}
               {!isComplete && <span className="animate-pulse">_</span>}
-            </p>
-          </div>
+            </span>
+          </span>
 
           {/* "Next" Indicator (Blinking Triangle) */}
           {isComplete && (
-            <div className="absolute bottom-1 right-2 text-green-400 animate-bounce text-lg">
+            <span aria-hidden className="absolute bottom-1 right-2 text-green-400 animate-bounce text-lg">
               ▼
-            </div>
+            </span>
           )}
-        </div>
+        </button>
 
-        <div className="text-center mt-1 text-[10px] sm:text-xs text-gray-500">
+        <div className="text-center mt-1 text-[10px] sm:text-xs text-gray-400">
           [ CLICK TO {isComplete ? "CONTINUE" : "SKIP"} ] &nbsp;·&nbsp;{" "}
           <span data-testid="line-counter">{index + 1}/{script.length}</span>
         </div>
       </div>
+      </main>
 
     </div>
   );

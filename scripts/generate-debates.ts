@@ -5,7 +5,6 @@ import { runDebate } from '../agents/orchestrator';
 import { DialogueLine } from '../types/court';
 import { assertPlayable } from './assert-playable';
 import * as fs from 'fs';
-import * as path from 'path';
 
 const PARTIAL = 'data/.debates-partial.json';
 
