@@ -14,6 +14,9 @@ const PROJECTS_DB = "2df64b3b983f807b8befe4e1772cef91";
 const WORK_DB = "2df64b3b983f8081851ee9ac6dcf0527";
 const SKILLS_DB = "2df64b3b983f80c3bc7cf93017d0b5fc";
 const COURSEWORK_DB = "2df64b3b983f80699d3bd3889e951e03";
+/** For read-only reporting scripts. */
+export const DATABASES = { Projects: PROJECTS_DB, Work: WORK_DB, Skills: SKILLS_DB, Coursework: COURSEWORK_DB };
+export { notion };
 
 export interface Project {
   title: string;

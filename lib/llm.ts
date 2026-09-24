@@ -6,8 +6,11 @@ import OpenAI from 'openai';
 let client: OpenAI | undefined;
 function getClient(): OpenAI {
   if (!client) {
+    // Named for the provider it is actually for. Checked here because the
+    // OpenAI SDK would otherwise fall back to OPENAI_API_KEY on its own.
+    if (!process.env.GLM_API_KEY) throw new Error('GLM_API_KEY is not set (expected in .env.local)');
     client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.GLM_API_KEY,
       baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
     });
   }

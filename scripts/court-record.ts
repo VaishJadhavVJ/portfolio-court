@@ -34,7 +34,7 @@ function oneLine(description: string): string {
   return first.slice(0, first.lastIndexOf(' ', MAX_SUMMARY - 1)).replace(/[,;:]$/, '') + '…';
 }
 
-async function checkLink(url: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function checkLink(url: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   let host: string;
   try {
     host = new URL(url).hostname;
@@ -84,7 +84,10 @@ async function main() {
   console.log(dropped.length ? `Dropped ${dropped.length} link(s):\n  ${dropped.join('\n  ')}` : 'No links dropped.');
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});
+// Only when run directly: scripts/notion-report.ts imports checkLink.
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exit(1);
+  });
+}
