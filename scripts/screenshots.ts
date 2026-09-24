@@ -91,6 +91,14 @@ async function main() {
       const hScroll = scroll.scrollW - scroll.clientW;
 
       let note = '';
+      if (page.name === 'home') {
+        // Chicago time, in the browser, in the "7:42 PM · Chicago" format.
+        const clock = ((await p.textContent('[data-testid="chicago-clock"]')) ?? '').trim();
+        const expect = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' }).format(new Date());
+        if (!/^\d{1,2}:\d{2} (AM|PM) · Chicago$/.test(clock)) problems.push(`${page.name}@${vp.label}: clock reads "${clock}"`);
+        else if (!clock.startsWith(expect.split(':')[0] + ':')) problems.push(`${page.name}@${vp.label}: clock "${clock}" is not Chicago time (${expect})`);
+        else note += `  clock "${clock}"`;
+      }
       if (page.name === 'court') {
         // Play a debate to the last line first. A build that renders line 1 but
         // cannot advance used to pass every check here; it never clicked.

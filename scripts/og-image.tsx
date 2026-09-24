@@ -30,7 +30,7 @@ async function main() {
   const serif = fs.readFileSync(path.join(ROOT, 'art/fonts/InstrumentSerif-Regular.ttf'));
 
   // Courthouse still, cropped so the building sits right and open sky sits left.
-  const scene = await sharp(path.join(ROOT, 'public/backgrounds/court-exterior.webp'))
+  const scene = await sharp(path.join(ROOT, 'public/backgrounds/court-exterior-summer-day-poster.webp'))
     .resize(W, H, { fit: 'cover', position: 'right' })
     .jpeg({ quality: 90 })
     .toBuffer();

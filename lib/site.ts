@@ -4,3 +4,7 @@ export const SITE_URL = "https://www.heyvaish.dev";
 // Links not provided yet. Leave these empty until the real URL is known: every
 // piece of UI that uses one stays hidden while it is empty. Never guess them.
 export const TALK_TO_VAISHNAVI_URL = "";
+/** A Spotify playlist page, e.g. https://open.spotify.com/playlist/<id>. Embedded in the footer. */
+export const SPOTIFY_PLAYLIST_URL = "";
+/** Medium profile or publication. Linked in the footer. */
+export const MEDIUM_URL = "";

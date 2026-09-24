@@ -4,6 +4,8 @@ import Link from "next/link";
 import { getProjects, getWorkExperience, getSkills, getCoursework } from "@/lib/notion";
 import HeroMedia, { HeroVideoToggle } from "@/components/HeroMedia";
 import MusicCredit from "@/components/MusicCredit";
+import ChicagoClock from "@/components/ChicagoClock";
+import { MEDIUM_URL, SPOTIFY_PLAYLIST_URL } from "@/lib/site";
 import { slugify } from "@/lib/slug";
 import debates from "@/data/debates.json";
 
@@ -23,6 +25,17 @@ const LINKS = [
   { label: "LinkedIn", href: "https://linkedin.com/in/vaishnavipjadhav", display: "linkedin.com/in/vaishnavipjadhav" },
   { label: "Email", href: "mailto:vaishnavipjadhav55@gmail.com", display: "vaishnavipjadhav55@gmail.com" },
 ];
+// Footer only: hidden while its config value is empty.
+const FOOTER_LINKS = [...LINKS, ...(MEDIUM_URL ? [{ label: "Medium", href: MEDIUM_URL, display: MEDIUM_URL }] : [])];
+
+/** Spotify's embed URL for a playlist page. A malformed value fails the build rather than shipping a broken player. */
+function spotifyEmbed(url: string): string | null {
+  if (!url) return null;
+  const m = url.match(/^https:\/\/open\.spotify\.com\/playlist\/([A-Za-z0-9]+)/);
+  if (!m) throw new Error(`SPOTIFY_PLAYLIST_URL is not a Spotify playlist URL: ${url}`);
+  return `https://open.spotify.com/embed/playlist/${m[1]}`;
+}
+const SPOTIFY_EMBED = spotifyEmbed(SPOTIFY_PLAYLIST_URL);
 
 const ABOUT =
   "I'm Vaishnavi Jadhav, an MS Computer Science student at UIC graduating May 2027. I started out at IBM working on mainframe systems, then pivoted into AI/ML. I'm on a research and founder track now, building more than I take courses. Looking for somewhere innovative to work next.";
@@ -191,6 +204,7 @@ export default async function Lobby() {
           >
             Looking for 2027 full-time opportunities
           </p>
+          <ChicagoClock className="rise mt-3 self-start rounded-full bg-black/60 px-3 py-1 font-mono text-xs text-white" />
 
           <div className="rise mt-7 flex flex-wrap items-center gap-3" style={{ animationDelay: "260ms" }}>
             <Link
@@ -394,7 +408,7 @@ export default async function Lobby() {
           </p>
           <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
             <ul className="flex flex-wrap gap-x-6 gap-y-2">
-              {LINKS.map(link => (
+              {FOOTER_LINKS.map(link => (
                 <li key={link.label}>
                   <a
                     href={link.href}
@@ -411,7 +425,21 @@ export default async function Lobby() {
               Vaishnavi Jadhav · 2026
             </p>
           </div>
-          <MusicCredit className="-mt-4 text-xs text-[#12200b]" />
+          {SPOTIFY_EMBED && (
+            <iframe
+              src={SPOTIFY_EMBED}
+              title="Spotify playlist"
+              width="100%"
+              height="152"
+              loading="lazy"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              className="max-w-md rounded-xl border-0"
+            />
+          )}
+          <div className="-mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#12200b]">
+            <MusicCredit />
+            <p>Courtroom inspired by Kaguya-sama: Love is War and the Ace Attorney series.</p>
+          </div>
         </div>
       </footer>
     </div>
