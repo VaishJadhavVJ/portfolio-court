@@ -12,6 +12,7 @@ import { TALK_TO_VAISHNAVI_URL } from "@/lib/site";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { AgentName, DialogueLine, Emotion } from "@/types/court";
 import debatesDataRaw from "@/data/debates.json";
+import courtRecord from "@/data/court-record.json";
 
 const debatesData = debatesDataRaw as Record<string, DialogueLine[]>;
 
@@ -38,6 +39,10 @@ const SPRITE_STAGE_SHARE = "66%";
 const OUT_MS = 180;
 const BG_MS = 260;
 const IN_MS = 220;
+
+/** Evidence cards, by topic title. Built by scripts/court-record.ts. */
+const EVIDENCE = new Map(courtRecord.map((r) => [r.title, r]));
+const EVIDENCE_MS = 7000;
 
 const MUTE_KEY = "court-muted"; // "1" = effects off
 const MUSIC_KEY = "court-music-off"; // "1" = music off
@@ -309,6 +314,22 @@ export default function GameStage() {
     };
   }, [currentLine, spriteControls]);
 
+  // "Evidence added to the Court Record": shown when a case starts (line 1 of a
+  // debate, not the intro). No dialogue, no sound. Leaves on its own after
+  // EVIDENCE_MS, paused while hovered or focused, or on the next advance.
+  const [evidence, setEvidence] = useState<(typeof courtRecord)[number] | null>(null);
+  const [evidenceHeld, setEvidenceHeld] = useState(false);
+  const caseStarted = live && !inIntro && !ended && index === 0;
+  useEffect(() => {
+    setEvidence(caseStarted ? EVIDENCE.get(selectedTopic) ?? null : null);
+    setEvidenceHeld(false);
+  }, [caseStarted, selectedTopic]);
+  useEffect(() => {
+    if (!evidence || evidenceHeld) return;
+    const t = setTimeout(() => setEvidence(null), EVIDENCE_MS);
+    return () => clearTimeout(t);
+  }, [evidence, evidenceHeld]);
+
   const toDebate = () => {
     try { localStorage.setItem(INTRO_KEY, "1"); } catch { /* not persisted; intro plays again next visit */ }
     setInIntro(false);
@@ -347,6 +368,7 @@ export default function GameStage() {
 
   const handleNext = () => {
     if (!live || ended || !currentLine) return;
+    setEvidence(null); // advancing dismisses the evidence card
 
     // A click on a still-typing line completes it instantly.
     if (!isComplete) {
@@ -606,6 +628,48 @@ export default function GameStage() {
               />
             </picture>
           </motion.div>
+        </AnimatePresence>
+
+        {/* Evidence card: top of the stage, so it can never cover the dialogue box */}
+        <AnimatePresence>
+          {evidence && (
+            <motion.aside
+              key={evidence.slug}
+              aria-label="Court Record"
+              data-testid="evidence-card"
+              initial={{ x: 40, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 40, opacity: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              onMouseEnter={() => setEvidenceHeld(true)}
+              onMouseLeave={() => setEvidenceHeld(false)}
+              onFocus={() => setEvidenceHeld(true)}
+              onBlur={() => setEvidenceHeld(false)}
+              className="absolute top-2 right-2 left-2 sm:left-auto sm:w-80 z-30 border-2 border-green-500 bg-black/90 p-3 pr-10 text-left"
+            >
+              <p className="text-[10px] sm:text-xs tracking-widest text-green-400">&gt; EVIDENCE ADDED TO THE COURT RECORD</p>
+              <p className="mt-1.5 text-sm text-white">{evidence.title}</p>
+              {evidence.summary && <p className="mt-1 text-xs leading-relaxed text-gray-300">{evidence.summary}</p>}
+              {evidence.link && (
+                <a
+                  href={evidence.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-flex min-h-8 items-center text-xs text-green-300 underline underline-offset-2 hover:text-green-200 focus-visible:outline-2 focus-visible:outline-green-300"
+                >
+                  view evidence ↗
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => setEvidence(null)}
+                aria-label="Dismiss evidence"
+                className="absolute top-1 right-1 h-8 w-8 text-green-400 hover:text-green-200 focus-visible:outline-2 focus-visible:outline-green-300"
+              >
+                ×
+              </button>
+            </motion.aside>
+          )}
         </AnimatePresence>
 
         {/* Grounding shadow so the sprite does not float on the bench */}

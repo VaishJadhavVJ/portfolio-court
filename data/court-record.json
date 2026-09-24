@@ -1,0 +1,80 @@
+[
+  {
+    "title": "Portfolio Court",
+    "slug": "portfolio-court",
+    "summary": "Portfolio Court turns my project portfolio into a courtroom where Builder, Strategist, and Contrarian agents debate each project.",
+    "link": null
+  },
+  {
+    "title": "AI Police",
+    "slug": "ai-police",
+    "summary": "AI Police tests whether coding agents accurately report their work.",
+    "link": "https://vaishjadhavvj.github.io/AI-Police/"
+  },
+  {
+    "title": "Guardrailed Causal Discovery for Alzheimer's Biomarkers",
+    "slug": "guardrailed-causal-discovery-for-alzheimers-biomarkers",
+    "summary": "First-author research on a guardrailed hybrid causal discovery pipeline over 2,167 participants in the NACC autopsy cohort.",
+    "link": null
+  },
+  {
+    "title": "Kindred",
+    "slug": "kindred",
+    "summary": "AI-powered relationship intelligence engine that maps professional networks using graph-based knowledge representation (Neo4j).",
+    "link": null
+  },
+  {
+    "title": "Moral Machine: LLM vs Human Ethical Benchmarking",
+    "slug": "moral-machine-llm-vs-human-ethical-benchmarking",
+    "summary": "Systematic comparison of ethical decision-making between major LLMs and human responses from MIT's Moral Machine dataset.",
+    "link": "https://github.com/VaishJadhavVJ/Moral-Machine-LLM-vs-Human-Ethical-Analysis"
+  },
+  {
+    "title": "Delulify",
+    "slug": "delulify",
+    "summary": "Python tool that intercepts runtime errors and transforms them into emotionally supportive debugging hints.",
+    "link": "https://github.com/VaishJadhavVJ/delulify"
+  },
+  {
+    "title": "UrbanScale",
+    "slug": "urbanscale",
+    "summary": "RL-based warehouse placement optimization for quick-commerce.",
+    "link": "https://github.com/gargi-sathe/CS594"
+  },
+  {
+    "title": "LoopBack",
+    "slug": "loopback",
+    "summary": "Civic engagement app for reporting and tracking local issues in Chicago.",
+    "link": "https://devpost.com/software/chicago-s-loopback"
+  },
+  {
+    "title": "Pillar",
+    "slug": "pillar",
+    "summary": "Real-time news transparency platform that maps media ownership networks.",
+    "link": "https://devpost.com/software/pillar-w7ly3o"
+  },
+  {
+    "title": "EdgeRecall",
+    "slug": "edgerecall",
+    "summary": "Stateful AI assistant running entirely on Cloudflare's edge network.",
+    "link": "https://github.com/VaishJadhavVJ/cf-ai-edgerecall"
+  },
+  {
+    "title": "Entropy-Based Selective Step Verification",
+    "slug": "entropy-based-selective-step-verification",
+    "summary": "Research on making small LLMs reason faster without losing accuracy.",
+    "link": null
+  },
+  {
+    "title": "Pathfinding Algorithm Visualizer",
+    "slug": "pathfinding-algorithm-visualizer",
+    "summary": "Interactive visualization of pathfinding algorithms (BFS, DFS, Dijkstra, A*) with real-time grid manipulation.",
+    "link": "https://github.com/VaishJadhavVJ/Pathfinding-Algorithm-Visualizer"
+  },
+  {
+    "title": "Redacted Lore",
+    "slug": "redacted-lore",
+    "summary": "Collaborative storytelling platform where community-written stories are progressively uncovered through automatic redaction mechanics, inspired by SCP…",
+    "link": "https://devpost.com/software/redactelore"
+  }
+]

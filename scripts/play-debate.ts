@@ -15,12 +15,15 @@ export interface PlayResult {
   problem?: string;
   /** Intro lines clicked through before the debate (0 = no intro shown). */
   introLines: number;
+  /** Evidence card: shown at case start, clear of the dialogue box, gone after the first press. */
+  evidence?: { shown: boolean; overlapsDialogue: boolean; dismissedOnAdvance: boolean };
 }
 
 const BEGIN = '[data-testid="begin"]';
 const BOX = '[data-testid="dialogue-box"]';
 const END = '[data-testid="end-card"]';
 const SKIP = '[data-testid="skip-intro"]';
+const EVIDENCE = '[data-testid="evidence-card"]';
 
 /** Clicks through the intro until it hands over to the debate. Returns lines seen, or -1 if it never ends. */
 export async function playIntro(page: Page): Promise<number> {
@@ -61,10 +64,22 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
   };
 
   const selected = topic ?? (await page.inputValue('select'));
+
+  const card = await page.waitForSelector(EVIDENCE, { timeout: 2000 }).catch(() => null);
+  let evidence: PlayResult['evidence'] = { shown: false, overlapsDialogue: false, dismissedOnAdvance: false };
+  if (card) {
+    const overlapsDialogue = await page.evaluate(() => {
+      const a = document.querySelector('[data-testid="evidence-card"]')!.getBoundingClientRect();
+      const b = document.querySelector('[data-testid="dialogue-box"]')!.getBoundingClientRect();
+      return !(a.bottom <= b.top || a.top >= b.bottom || a.right <= b.left || a.left >= b.right);
+    });
+    evidence = { shown: true, overlapsDialogue, dismissedOnAdvance: false };
+  }
+
   const start = await read();
   let index = start.index;
   const total = start.total;
-  const fail = (problem: string): PlayResult => ({ topic: selected, reached: index, total, ok: false, problem, introLines });
+  const fail = (problem: string): PlayResult => ({ topic: selected, reached: index, total, ok: false, problem, introLines, evidence });
 
   // Target total + 1 is the end card. Each step may need two clicks: one to
   // skip the typewriter, one to advance.
@@ -73,6 +88,9 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
     for (let attempt = 0; attempt < 12 && !advanced; attempt++) {
       await page.click(BOX);
       await page.waitForTimeout(120);
+      if (evidence.shown && target === start.index + 1 && attempt === 0) {
+        evidence.dismissedOnAdvance = await page.waitForSelector(EVIDENCE, { state: 'detached', timeout: 1000 }).then(() => true, () => false);
+      }
       if (target > total && (await page.isVisible(END))) {
         advanced = true;
         continue;
@@ -92,5 +110,5 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
   await page.waitForTimeout(150);
   if ((await read()).index !== total) return fail('advanced past the end card');
 
-  return { topic: selected, reached: index, total, ok: true, introLines };
+  return { topic: selected, reached: index, total, ok: true, introLines, evidence };
 }

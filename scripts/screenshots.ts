@@ -10,6 +10,7 @@
 import { chromium, type ConsoleMessage, type Request } from 'playwright';
 import * as fs from 'fs';
 import debatesRaw from '../data/debates.json';
+import courtRecord from '../data/court-record.json';
 import { playDebate, playIntro } from './play-debate';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
@@ -86,10 +87,18 @@ async function main() {
         const sample = topics;
         if (audio.length) problems.push(`${page.name}@${vp.label}: ${audio.length} audio file(s) loaded before the begin click: ${audio.join(', ')}`);
         let ended = 0;
+        let evidenceShown = 0;
         let first = true;
         for (const topic of sample) {
           const r = await playDebate(p, topic);
           if (r.ok) ended++;
+          const ev = r.evidence;
+          const wantEvidence = courtRecord.some((c) => c.title === topic);
+          if (wantEvidence && !ev?.shown) problems.push(`${page.name}@${vp.label}: "${topic}" showed no evidence card`);
+          if (!wantEvidence && ev?.shown) problems.push(`${page.name}@${vp.label}: "${topic}" showed an evidence card it has no record for`);
+          if (ev?.shown && ev.overlapsDialogue) problems.push(`${page.name}@${vp.label}: "${topic}" evidence card overlaps the dialogue box`);
+          if (ev?.shown && !ev.dismissedOnAdvance) problems.push(`${page.name}@${vp.label}: "${topic}" evidence card stayed after advancing`);
+          if (ev?.shown) evidenceShown++;
           // Fresh context = first visit: the intro must play, all of it.
           if (first && r.introLines < 6) problems.push(`${page.name}@${vp.label}: first visit showed ${r.introLines} intro lines, expected 6`);
           if (first) note += `  intro ${r.introLines} lines |`;
@@ -97,7 +106,7 @@ async function main() {
           first = false;
           if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" ${r.problem}`);
         }
-        note += `  ${ended}/${sample.length} debates reached the end card`;
+        note += `  ${ended}/${sample.length} debates reached the end card, ${evidenceShown} evidence cards`;
 
         // The end card's REPLAY INTRO must bring the intro back and hand over again.
         if (await p.isVisible('[data-testid="end-replay-intro"]')) {
