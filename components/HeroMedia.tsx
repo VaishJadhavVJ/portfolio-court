@@ -110,7 +110,9 @@ function Still({ v, onReady }: { v: string; onReady?: () => void }) {
   return (
     <picture>
       <source media="(min-width: 768px)" srcSet={f.poster} />
-      <img src={f.mobile} alt="" aria-hidden className={SHARED} style={PIXELS} onLoad={onReady} data-testid="hero-still" />
+      {/* Low priority: it is scenery behind the text, and at Medium it took
+          bandwidth from the text Lighthouse counts as the page's main content. */}
+      <img src={f.mobile} alt="" aria-hidden fetchPriority="low" className={SHARED} style={PIXELS} onLoad={onReady} data-testid="hero-still" />
     </picture>
   );
 }

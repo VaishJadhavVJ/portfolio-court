@@ -555,6 +555,9 @@ export default function GameStage() {
               className="w-full max-w-xs border-4 border-green-500 bg-black px-5 py-5 text-green-400"
             >
               <p className="text-sm sm:text-base tracking-widest">&gt; COURT IS IN SESSION</p>
+              {/* Height reserved up front: the options only appear once the URL
+                  has been read, and must not push the box around when they do. */}
+              <div className="min-h-[116px]">
               {urlRead && deepTopic && (
                 <>
                   <p className="mt-2 text-xs text-green-300">&gt; CASE: {deepTopic}</p>
@@ -592,8 +595,9 @@ export default function GameStage() {
                   )}
                 </ul>
               )}
+              </div>
             </nav>
-            <MusicCredit className="max-w-xs text-center text-[10px] sm:text-xs text-gray-300" />
+            <MusicCredit className="max-w-xs text-center text-xs text-gray-300" />
           </div>
         )}
 
