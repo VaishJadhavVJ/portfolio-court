@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback, type MouseEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type MouseEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Howler } from "howler";
@@ -7,6 +7,8 @@ import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import AgentSprite from "./AgentSprite";
 import CourtAudio, { AUDIO, type CourtAudioHandle } from "./CourtAudio";
 import MusicCredit from "@/components/MusicCredit";
+import { slugify } from "@/lib/slug";
+import { TALK_TO_VAISHNAVI_URL } from "@/lib/site";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { AgentName, DialogueLine, Emotion } from "@/types/court";
 import debatesDataRaw from "@/data/debates.json";
@@ -74,6 +76,9 @@ function unlockAudio() {
   tick.connect(ctx.destination);
   tick.start(0);
 }
+
+const MENU_ITEM =
+  "mt-2 block w-full min-h-11 px-3 py-2 text-left text-xs sm:text-sm hover:bg-green-950 hover:text-green-200 focus-visible:outline-none focus-visible:bg-green-950 focus-visible:text-green-200 focus-visible:ring-2 focus-visible:ring-green-300";
 
 const linesFor = (topic: string) => (debatesData[topic] ?? []).filter((l) => l.text.trim());
 
@@ -152,13 +157,39 @@ export default function GameStage() {
   const [audioTimedOut, setAudioTimedOut] = useState(false);
   const onAudioReady = useCallback(() => setAudioReady(true), []);
   const [inIntro, setInIntro] = useState(false);
-  const begin = () => {
+  /** Every title-screen option runs this inside its click: it is the audio gesture. */
+  const begin = (forceIntro = false) => {
     unlockAudio();
     let seen = false;
     try { seen = localStorage.getItem(INTRO_KEY) === "1"; } catch { /* storage blocked: play the intro */ }
-    setInIntro(!seen);
+    setInIntro(forceIntro || !seen);
     setAudioOn(true);
     setBegun(true);
+  };
+
+  // /court?topic=<slug> goes straight to that case after one press (still
+  // needed for audio). Read after mount: the page is static, so the server
+  // cannot see the query. An unknown slug just shows the menu. Until the URL
+  // has been read, the title screen shows no options, so a deep link never
+  // flashes the menu first.
+  const [urlRead, setUrlRead] = useState(false);
+  const [deepTopic, setDeepTopic] = useState<string | null>(null);
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search).get("topic");
+    const match = slug ? topics.find((t) => slugify(t) === slug) : undefined;
+    if (match) {
+      setDeepTopic(match);
+      handleTopicChange(match);
+    }
+    setUrlRead(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+  }, []);
+  const menuKeys = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[data-menu-item]")];
+    const i = items.indexOf(document.activeElement as HTMLElement);
+    e.preventDefault();
+    items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
   };
   useEffect(() => {
     if (!begun) return;
@@ -446,16 +477,51 @@ export default function GameStage() {
 
         {!begun && (
           <div className="absolute inset-0 z-[45] flex flex-col items-center justify-center gap-4 bg-black/80 p-4">
-            <button
-              type="button"
-              onClick={begin}
-              autoFocus
-              data-testid="begin"
-              className="border-4 border-green-500 bg-black px-6 py-5 text-sm sm:text-base text-green-400 tracking-widest hover:bg-green-950 focus-visible:outline-none focus-visible:border-green-200 focus-visible:ring-4 focus-visible:ring-green-300/70"
+            <nav
+              aria-label="Title screen"
+              onKeyDown={menuKeys}
+              data-testid="title-menu"
+              className="w-full max-w-xs border-4 border-green-500 bg-black px-5 py-5 text-green-400"
             >
-              &gt; COURT IS IN SESSION
-              <span className="mt-3 block text-xs text-green-300 animate-pulse">[ PRESS TO BEGIN ]</span>
-            </button>
+              <p className="text-sm sm:text-base tracking-widest">&gt; COURT IS IN SESSION</p>
+              {urlRead && deepTopic && (
+                <>
+                  <p className="mt-2 text-xs text-green-300">&gt; CASE: {deepTopic}</p>
+                  <button type="button" onClick={() => begin()} autoFocus data-menu-item data-testid="begin" className={MENU_ITEM}>
+                    [ PRESS TO BEGIN ]
+                  </button>
+                </>
+              )}
+              {urlRead && !deepTopic && (
+                <ul className="mt-3">
+                  <li>
+                    <button type="button" onClick={() => begin()} autoFocus data-menu-item data-testid="begin" className={MENU_ITEM}>
+                      [ WATCH A CASE ]
+                    </button>
+                  </li>
+                  <li>
+                    <button type="button" onClick={() => begin(true)} data-menu-item data-testid="menu-intro" className={MENU_ITEM}>
+                      [ REPLAY INTRO ]
+                    </button>
+                  </li>
+                  {TALK_TO_VAISHNAVI_URL && (
+                    <li>
+                      <a
+                        href={TALK_TO_VAISHNAVI_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={unlockAudio}
+                        data-menu-item
+                        data-testid="menu-talk"
+                        className={MENU_ITEM}
+                      >
+                        [ TALK TO VAISHNAVI ↗ ]
+                      </a>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </nav>
             <MusicCredit className="max-w-xs text-center text-[10px] sm:text-xs text-gray-300" />
           </div>
         )}

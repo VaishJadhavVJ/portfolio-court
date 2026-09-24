@@ -37,7 +37,9 @@ export async function playIntro(page: Page): Promise<number> {
 }
 
 export async function playDebate(page: Page, topic?: string): Promise<PlayResult> {
-  // Every visit opens on the begin screen; it only needs pressing once per load.
+  // Every visit opens on the title screen; it only needs pressing once per load.
+  // Its options appear once the page has read the URL, so wait briefly for them.
+  await page.waitForSelector(BEGIN, { timeout: 5000 }).catch(() => null);
   if (await page.isVisible(BEGIN)) {
     await page.click(BEGIN);
     await page.waitForSelector(BEGIN, { state: 'detached' });

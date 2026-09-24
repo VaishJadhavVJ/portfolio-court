@@ -190,6 +190,58 @@ async function main() {
     }
   }
 
+  // Doorways into the courtroom: title menu, deep links, "take it to court".
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const p = await ctx.newPage();
+    const where = 'doorways@390';
+    p.on('console', (m: ConsoleMessage) => {
+      if (m.type() === 'error' || m.type() === 'warning') problems.push(`${where}: console ${m.type()}: ${m.text()}`);
+    });
+    p.on('response', (r) => { if (r.status() >= 400) problems.push(`${where}: ${r.status()} ${r.url()}`); });
+
+    // Menu: focus starts on the first option; arrows move; Enter picks.
+    await p.goto(BASE + '/court', { waitUntil: 'load' });
+    await p.waitForSelector('[data-testid="menu-intro"]');
+    const focus0 = await p.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+    await p.keyboard.press('ArrowDown');
+    const focus1 = await p.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+    await p.keyboard.press('Enter');
+    const introShown = await p.waitForSelector('[data-testid="skip-intro"]', { timeout: 5000 }).then(() => true, () => false);
+    if (focus0 !== 'begin' || focus1 !== 'menu-intro' || !introShown) {
+      problems.push(`${where}: title menu keyboard (focus ${focus0} -> ${focus1}, intro via Enter: ${introShown})`);
+    }
+
+    // Unknown slug: the menu, no error.
+    await p.goto(BASE + '/court?topic=no-such-case', { waitUntil: 'load' });
+    if (!(await p.waitForSelector('[data-testid="menu-intro"]', { timeout: 5000 }).then(() => true, () => false))) {
+      problems.push(`${where}: unknown topic slug did not fall back to the menu`);
+    }
+
+    // Every "take it to court" link, clicked from the landing page, lands on
+    // its own case and plays to the end card.
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    const links = await p.$$eval('[data-testid="take-to-court"]', (as) =>
+      as.map((a) => ({ href: a.getAttribute('href'), title: a.closest('li')?.querySelector('h3')?.textContent?.replace(/\s*↗\s*$/, '').trim() ?? '' }))
+    );
+    const debated = new Set(Object.keys(debatesRaw));
+    const cards = await p.$$eval('#projects li h3', (hs) => hs.map((h) => h.textContent?.replace(/\s*↗\s*$/, '').trim() ?? ''));
+    const expected = cards.filter((t) => debated.has(t));
+    if (links.length !== expected.length) problems.push(`${where}: ${links.length} take-it-to-court links for ${expected.length} debated projects`);
+    let played = 0;
+    for (let i = 0; i < links.length; i++) {
+      if (i > 0) await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+      await p.click(`[data-testid="take-to-court"] >> nth=${i}`);
+      await p.waitForURL(/\/court\?topic=/);
+      const r = await playDebate(p);
+      if (r.topic !== links[i].title) problems.push(`${where}: ${links[i].href} opened "${r.topic}", expected "${links[i].title}"`);
+      else if (!r.ok) problems.push(`${where}: ${links[i].href} ${r.problem}`);
+      else played++;
+    }
+    console.log(`${where.padEnd(14)} menu focus ${focus0}->${focus1}, intro via keyboard ${introShown} | ${played}/${links.length} take-it-to-court links played to the end card`);
+    await ctx.close();
+  }
+
   await browser.close();
 
   if (problems.length) {

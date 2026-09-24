@@ -4,6 +4,11 @@ import Link from "next/link";
 import { getProjects, getWorkExperience, getSkills, getCoursework } from "@/lib/notion";
 import HeroMedia, { HeroVideoToggle } from "@/components/HeroMedia";
 import MusicCredit from "@/components/MusicCredit";
+import { slugify } from "@/lib/slug";
+import debates from "@/data/debates.json";
+
+/** Projects with a courtroom case. Server-only: the transcripts never reach the client. */
+const DEBATED = new Set(Object.keys(debates));
 
 export const revalidate = 60; // Revalidate every 60 seconds (optional, but good for CMS)
 
@@ -277,6 +282,16 @@ export default async function Lobby() {
                       <p className="mt-2.5 font-mono text-[11px] leading-relaxed text-[var(--on-dark-muted)]">
                         {project.tech.join(" · ")}
                       </p>
+                    )}
+                    {DEBATED.has(project.title) && (
+                      <Link
+                        href={`/court?topic=${slugify(project.title)}`}
+                        data-testid="take-to-court"
+                        className="mt-4 inline-flex items-center gap-2 border border-[var(--card-rule)] px-2.5 py-1.5 font-mono text-[11px] tracking-[0.06em] text-[var(--on-dark-soft)] transition-colors hover:border-green-400 hover:text-green-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-300"
+                      >
+                        <span aria-hidden className="h-1.5 w-1.5 bg-green-400" />
+                        take it to court →
+                      </Link>
                     )}
                   </div>
                 </li>
