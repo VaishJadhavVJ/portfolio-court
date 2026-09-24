@@ -13,6 +13,7 @@
     "@notionhq/client": "^2.3.0",
     "dotenv": "^17.4.2",
     "framer-motion": "^12.24.12",
+    "howler": "^2.2.4",
     "next": "^16.3.6",
     "openai": "^6.39.1",
     "react": "19.2.3",
@@ -20,6 +21,7 @@
     "use-sound": "^5.0.0"
   },
   "devDependencies": {
+    "@types/howler": "^2.2.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

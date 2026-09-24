@@ -57,6 +57,10 @@ async function main() {
         if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`);
       });
 
+      // Every audio request, in order. Nothing may load before the begin click.
+      const audio: string[] = [];
+      p.on('request', (r) => { if (/\/sounds\/|\.(mp3|m4a|ogg|wav)(\?|$)/.test(r.url())) audio.push(r.url()); });
+
       await p.goto(BASE + page.path, { waitUntil: 'networkidle' });
       await p.waitForTimeout(600);
 
@@ -80,6 +84,7 @@ async function main() {
         const topics: string[] = await p.$$eval('select option', (os) => os.map((o) => (o as HTMLOptionElement).value));
         // Every debate, not a sample: a broken topic only fails when it is played.
         const sample = topics;
+        if (audio.length) problems.push(`${page.name}@${vp.label}: ${audio.length} audio file(s) loaded before the begin click: ${audio.join(', ')}`);
         let ended = 0;
         let first = true;
         for (const topic of sample) {
@@ -88,6 +93,7 @@ async function main() {
           // Fresh context = first visit: the intro must play, all of it.
           if (first && r.introLines < 6) problems.push(`${page.name}@${vp.label}: first visit showed ${r.introLines} intro lines, expected 6`);
           if (first) note += `  intro ${r.introLines} lines |`;
+          if (first && !audio.some((u) => u.includes('/sounds/bgm.mp3'))) problems.push(`${page.name}@${vp.label}: music did not load after the begin click`);
           first = false;
           if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" ${r.problem}`);
         }
@@ -141,16 +147,34 @@ async function main() {
 
         // Top bar must not overlap on narrow screens.
         const bar = await p.evaluate(() => {
-          const sel = document.querySelector('select')?.getBoundingClientRect();
-          const esc = document.querySelector('[data-testid="mute-toggle"]')?.getBoundingClientRect();
-          if (!sel || !esc) return null;
-          return { gap: Math.round(esc.left - sel.right), selH: Math.round(sel.height), escH: Math.round(esc.height) };
+          const els = ['select', '[data-testid="mute-toggle"]', '[data-testid="music-toggle"]', 'header a[href="/"]']
+            .map((q) => document.querySelector(q)?.getBoundingClientRect());
+          if (els.some((e) => !e)) return null;
+          const r = els as DOMRect[];
+          return {
+            gap: Math.round(Math.min(...r.slice(1).map((e, i) => (Math.abs(e.top - r[i].top) < 4 ? e.left - r[i].right : Infinity)))),
+            minH: Math.round(Math.min(...r.map((e) => e.height))),
+            selW: Math.round(r[0].width),
+          };
         });
-        if (bar) {
+        if (!bar) problems.push(`${page.name}@${vp.label}: top bar controls missing`);
+        else {
           if (bar.gap < 0) problems.push(`${page.name}@${vp.label}: top bar overlaps by ${-bar.gap}px`);
-          if (bar.selH < 40 || bar.escH < 40) problems.push(`${page.name}@${vp.label}: tap targets under 40px (select ${bar.selH}, mute ${bar.escH})`);
-          note += `  | topbar gap ${bar.gap}px, targets ${bar.selH}/${bar.escH}px`;
+          if (bar.minH < 40) problems.push(`${page.name}@${vp.label}: tap target under 40px (${bar.minH}px)`);
+          if (bar.selW < 120) problems.push(`${page.name}@${vp.label}: topic select squeezed to ${bar.selW}px`);
+          note += `  | topbar gap ${bar.gap}px, min target ${bar.minH}px, select ${bar.selW}px`;
         }
+
+        // Both sound switches survive a reload.
+        await p.click('[data-testid="mute-toggle"]');
+        await p.click('[data-testid="music-toggle"]');
+        await p.reload({ waitUntil: 'load' });
+        await p.waitForSelector('[data-testid="begin"]');
+        const pressed = await p.evaluate(() =>
+          ['mute-toggle', 'music-toggle'].map((t) => document.querySelector(`[data-testid="${t}"]`)?.getAttribute('aria-pressed'))
+        );
+        if (pressed.join() !== 'false,false') problems.push(`${page.name}@${vp.label}: toggles did not persist (sfx/music pressed = ${pressed.join('/')})`);
+        else note += ' | toggles persist';
       }
 
       if (page.fullscreen && vScroll > 0) problems.push(`${page.name}@${vp.label}: page scrolls vertically by ${vScroll}px`);

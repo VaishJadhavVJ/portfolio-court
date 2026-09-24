@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getProjects, getWorkExperience, getSkills, getCoursework } from "@/lib/notion";
 import HeroMedia, { HeroVideoToggle } from "@/components/HeroMedia";
+import MusicCredit from "@/components/MusicCredit";
 
 export const revalidate = 60; // Revalidate every 60 seconds (optional, but good for CMS)
 
@@ -395,6 +396,7 @@ export default async function Lobby() {
               Vaishnavi Jadhav · 2026
             </p>
           </div>
+          <MusicCredit className="-mt-4 text-xs text-[#12200b]" />
         </div>
       </footer>
     </div>

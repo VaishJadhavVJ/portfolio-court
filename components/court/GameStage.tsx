@@ -1,9 +1,12 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type MouseEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Howler } from "howler";
 import { motion, AnimatePresence, useAnimationControls } from "framer-motion";
 import AgentSprite from "./AgentSprite";
-import CourtAudio, { type CourtAudioHandle } from "./CourtAudio";
+import CourtAudio, { AUDIO, type CourtAudioHandle } from "./CourtAudio";
+import MusicCredit from "@/components/MusicCredit";
 import { useTypewriter } from "@/hooks/useTypewriter";
 import { AgentName, DialogueLine, Emotion } from "@/types/court";
 import debatesDataRaw from "@/data/debates.json";
@@ -34,7 +37,8 @@ const OUT_MS = 180;
 const BG_MS = 260;
 const IN_MS = 220;
 
-const MUTE_KEY = "court-muted";
+const MUTE_KEY = "court-muted"; // "1" = effects off
+const MUSIC_KEY = "court-music-off"; // "1" = music off
 const INTRO_KEY = "court-intro-seen";
 
 /** First-visit opening, played in the dialogue box before the first debate. */
@@ -46,6 +50,30 @@ const INTRO: DialogueLine[] = [
   { id: 5, speaker: "child", emotion: "confused", text: "HOLD IT!! I'm the Contrarian. They ask if it works. I ask why it EXISTS. Has anyone checked? ...No? Cool. Cool cool cool." },
   { id: 6, speaker: "child", emotion: "amazed", text: "Her projects are on trial and we never agree. Court is now in session!!" },
 ];
+
+const TOGGLE =
+  "shrink-0 h-11 px-2 sm:px-3 border-2 border-green-500 text-xs font-mono whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200";
+const TOGGLE_ON = "bg-black text-green-400 hover:bg-green-950";
+const TOGGLE_OFF = "bg-black text-green-400/70 line-through hover:bg-green-950";
+
+/**
+ * Must run synchronously inside the click handler. iOS Safari only lets audio
+ * start inside a gesture's own call stack, and use-sound builds its players
+ * after the click, in an effect. Creating Howler's shared AudioContext here and
+ * playing one silent sample unlocks it for every sound that follows. Importing
+ * howler does not create a context by itself, so nothing starts before the
+ * click; the audio files still load lazily afterwards.
+ */
+function unlockAudio() {
+  if (!Howler.ctx) Howler.volume(Howler.volume()); // volume() creates the context on first use
+  const ctx = Howler.ctx;
+  if (!ctx) return; // no Web Audio: nothing to unlock
+  if (ctx.state !== "running") void ctx.resume();
+  const tick = ctx.createBufferSource();
+  tick.buffer = ctx.createBuffer(1, 1, 22050);
+  tick.connect(ctx.destination);
+  tick.start(0);
+}
 
 const linesFor = (topic: string) => (debatesData[topic] ?? []).filter((l) => l.text.trim());
 
@@ -83,15 +111,35 @@ export default function GameStage() {
 
   // Mute is remembered across visits. Read after mount so the server render and
   // the first client render agree.
+  // Effects and music switch off independently; both are remembered.
   const [muted, setMuted] = useState(false);
+  const [musicOn, setMusicOn] = useState(true);
   useEffect(() => {
-    try { setMuted(localStorage.getItem(MUTE_KEY) === "1"); } catch { /* storage blocked: default to sound on */ }
+    try {
+      setMuted(localStorage.getItem(MUTE_KEY) === "1");
+      setMusicOn(localStorage.getItem(MUSIC_KEY) !== "1");
+    } catch { /* storage blocked: default to everything on */ }
   }, []);
   const toggleMute = () => {
     setMuted((m) => {
       try { localStorage.setItem(MUTE_KEY, m ? "0" : "1"); } catch { /* not persisted; still toggles */ }
       return !m;
     });
+  };
+  const toggleMusic = () => {
+    setMusicOn((on) => {
+      try { localStorage.setItem(MUSIC_KEY, on ? "1" : "0"); } catch { /* not persisted; still toggles */ }
+      return !on;
+    });
+  };
+
+  // Leaving fades the music out first rather than cutting it off.
+  const router = useRouter();
+  const exit = async (e: MouseEvent) => {
+    if (!audioRef.current) return; // nothing playing: plain navigation
+    e.preventDefault();
+    await audioRef.current.fadeOutMusic();
+    router.push("/");
   };
   const dialogueRef = useRef<HTMLButtonElement>(null);
 
@@ -105,6 +153,7 @@ export default function GameStage() {
   const onAudioReady = useCallback(() => setAudioReady(true), []);
   const [inIntro, setInIntro] = useState(false);
   const begin = () => {
+    unlockAudio();
     let seen = false;
     try { seen = localStorage.getItem(INTRO_KEY) === "1"; } catch { /* storage blocked: play the intro */ }
     setInIntro(!seen);
@@ -153,18 +202,19 @@ export default function GameStage() {
       audioRef.current?.takeThat();
     }
 
-    // Emotion-triggered sounds
-    if (currentLine.emotion === "point") {
+    // Emotion-triggered sounds. Never on back-to-back lines: a run of "point"
+    // lines slams once, on the first.
+    if (currentLine.emotion === "point" && lines[index - 1]?.emotion !== "point") {
       audioRef.current?.deskSlam();
     }
-  }, [live, index, currentLine]);
+  }, [live, index, currentLine, lines]);
 
-  // Text blip sound (throttled — every 3rd character)
+  // Typewriter blip, throttled to one per AUDIO.blipEvery characters
   useEffect(() => {
     if (!live || !currentLine || displayedText.length === 0 || isComplete) return;
 
     blipCounterRef.current++;
-    if (blipCounterRef.current % 3 === 0) {
+    if (blipCounterRef.current % AUDIO.blipEvery === 0) {
       audioRef.current?.blip();
     }
   }, [live, displayedText, currentLine, isComplete]);
@@ -308,7 +358,7 @@ export default function GameStage() {
     return (
       <div className="relative min-h-screen bg-[#202020] text-white font-mono flex items-center justify-center">
         <p className="text-red-500">No dialogue available. Please generate debates.</p>
-        {audioOn && <CourtAudio ref={audioRef} thinking muted={muted} />}
+        {audioOn && <CourtAudio ref={audioRef} thinking muted={muted} musicOn={musicOn} typing={false} />}
         <Link href="/" className="ml-4 px-4 py-2 bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners">
           [ ESCAPE ]
         </Link>
@@ -319,7 +369,16 @@ export default function GameStage() {
   return (
     <div className="fixed inset-0 h-[100dvh] w-full bg-[#202020] text-white font-mono overflow-hidden flex flex-col">
 
-      {audioOn && <CourtAudio ref={audioRef} thinking={false} muted={muted} onReady={onAudioReady} />}
+      {audioOn && (
+        <CourtAudio
+          ref={audioRef}
+          thinking={false}
+          muted={muted}
+          musicOn={musicOn}
+          typing={live && !ended && !isComplete}
+          onReady={onAudioReady}
+        />
+      )}
 
       {/* 1. CRT SCANLINE EFFECT (Overlay) */}
       <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
@@ -335,11 +394,12 @@ export default function GameStage() {
         </div>
       )}
 
-      {/* 2. TOP BAR — one row, 44px tap targets, select takes the slack */}
-      <header className="shrink-0 w-full px-3 py-2 sm:px-4 sm:py-3 z-40 flex items-center gap-2 sm:gap-4">
+      {/* 2. TOP BAR — 44px tap targets, select takes the slack. Under 480px the
+          select gets its own row: beside three buttons it shrank to its arrow. */}
+      <header className="shrink-0 w-full px-3 py-2 sm:px-4 sm:py-3 z-40 flex flex-wrap min-[480px]:flex-nowrap items-center gap-2 sm:gap-4">
         <span className="hidden md:inline text-xs text-green-500 shrink-0">SYS.2026.LOGS</span>
         <select
-          className="flex-1 min-w-0 h-11 bg-black border-2 border-green-500 text-green-400 text-xs px-2 outline-none font-mono rounded-none focus-visible:border-green-200 focus-visible:ring-2 focus-visible:ring-green-200"
+          className="basis-full min-[480px]:basis-auto flex-1 min-w-0 h-11 bg-black border-2 border-green-500 text-green-400 text-xs px-2 outline-none font-mono rounded-none focus-visible:border-green-200 focus-visible:ring-2 focus-visible:ring-green-200"
           value={selectedTopic}
           onChange={(e) => handleTopicChange(e.target.value)}
           aria-label="Debate topic"
@@ -348,21 +408,30 @@ export default function GameStage() {
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
+        {/* Pressed = on. Off reads as struck through, so the state never relies on colour alone. */}
         <button
           type="button"
           onClick={toggleMute}
-          aria-pressed={muted}
+          aria-pressed={!muted}
           data-testid="mute-toggle"
-          className={`shrink-0 h-11 px-3 border-2 border-green-500 text-xs font-mono whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-200 ${
-            muted ? "bg-green-500 text-black" : "bg-black text-green-400 hover:bg-green-950"
-          }`}
+          className={`${TOGGLE} ${muted ? TOGGLE_OFF : TOGGLE_ON}`}
         >
-          {muted ? "[ MUTED ]" : "[ MUTE ]"}
+          [ SFX ]
+        </button>
+        <button
+          type="button"
+          onClick={toggleMusic}
+          aria-pressed={musicOn}
+          data-testid="music-toggle"
+          className={`${TOGGLE} ${musicOn ? TOGGLE_ON : TOGGLE_OFF}`}
+        >
+          [ MUSIC ]
         </button>
         {/* pixel-corners clips anything drawn outside the box, so the focus ring is inset */}
         <Link
           href="/"
-          className="shrink-0 h-11 px-4 flex items-center justify-center bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners whitespace-nowrap focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white"
+          onClick={exit}
+          className="ml-auto min-[480px]:ml-0 shrink-0 h-11 px-3 sm:px-4 flex items-center justify-center bg-red-600 text-white text-xs hover:bg-red-500 pixel-corners whitespace-nowrap focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-white"
         >
           [ ESCAPE ]
         </Link>
@@ -376,7 +445,7 @@ export default function GameStage() {
         </p>
 
         {!begun && (
-          <div className="absolute inset-0 z-[45] flex items-center justify-center bg-black/80 p-4">
+          <div className="absolute inset-0 z-[45] flex flex-col items-center justify-center gap-4 bg-black/80 p-4">
             <button
               type="button"
               onClick={begin}
@@ -387,6 +456,7 @@ export default function GameStage() {
               &gt; COURT IS IN SESSION
               <span className="mt-3 block text-xs text-green-300 animate-pulse">[ PRESS TO BEGIN ]</span>
             </button>
+            <MusicCredit className="max-w-xs text-center text-[10px] sm:text-xs text-gray-300" />
           </div>
         )}
 
@@ -419,6 +489,7 @@ export default function GameStage() {
                 </button>
                 <Link
                   href="/"
+                  onClick={exit}
                   data-testid="end-exit"
                   className="h-11 px-3 flex items-center border-2 border-red-500 text-xs text-red-300 hover:bg-red-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
                 >

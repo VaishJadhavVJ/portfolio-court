@@ -45,3 +45,6 @@ tmp-sprites/
 
 # playwright output
 screenshots/
+
+# audio sources (large; the encoded web version lives in public/sounds/)
+art/audio/*.wav
