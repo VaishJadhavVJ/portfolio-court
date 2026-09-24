@@ -13,6 +13,7 @@ import { useTypewriter } from "@/hooks/useTypewriter";
 import { AgentName, DialogueLine, Emotion } from "@/types/court";
 import debatesDataRaw from "@/data/debates.json";
 import courtRecord from "@/data/court-record.json";
+import verdictsRaw from "@/data/verdicts.json";
 
 const debatesData = debatesDataRaw as Record<string, DialogueLine[]>;
 
@@ -85,7 +86,19 @@ function unlockAudio() {
 const MENU_ITEM =
   "mt-2 block w-full min-h-11 px-3 py-2 text-left text-xs sm:text-sm hover:bg-green-950 hover:text-green-200 focus-visible:outline-none focus-visible:bg-green-950 focus-visible:text-green-200 focus-visible:ring-2 focus-visible:ring-green-300";
 
-const linesFor = (topic: string) => (debatesData[topic] ?? []).filter((l) => l.text.trim());
+/** Title card and narrator verdict per case. Built by scripts/generate-verdicts.ts. */
+const verdicts = verdictsRaw as Record<string, { title: string; verdict: string; emotion: Emotion }>;
+// Fail the build, not the visitor: a case without its title card or verdict
+// would otherwise just skip them without a word.
+const unnarrated = Object.keys(debatesData).filter((t) => !verdicts[t]?.title || !verdicts[t]?.verdict);
+if (unnarrated.length) throw new Error(`data/verdicts.json has no title card or verdict for: ${unnarrated.join(", ")}`);
+
+/** A case: the debate, then the narrator's verdict as its final line. */
+const linesFor = (topic: string): DialogueLine[] => {
+  const debate = (debatesData[topic] ?? []).filter((l) => l.text.trim());
+  const v = verdicts[topic];
+  return v ? [...debate, { id: debate.length + 1, speaker: "narrator", emotion: v.emotion, text: v.verdict }] : debate;
+};
 
 export default function GameStage() {
   const topics = Object.keys(debatesData);
@@ -210,6 +223,23 @@ export default function GameStage() {
     if (ended) replayRef.current?.focus();
   }, [ended]);
 
+  // Each case opens on its title card ("The X Wants to Y"): full screen,
+  // advanced by a click or key. Nothing types or sounds until it is dismissed.
+  const [titleUp, setTitleUp] = useState(false);
+  const atCaseStart = begun && !inIntro && !ended && index === 0;
+  useEffect(() => {
+    if (atCaseStart) setTitleUp(true);
+  }, [atCaseStart, selectedTopic]);
+  const titleRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (titleUp) titleRef.current?.focus();
+  }, [titleUp]);
+  const dismissTitle = () => {
+    setTitleUp(false);
+    dialogueRef.current?.focus();
+  };
+  const playing = live && !titleUp;
+
   // Refs for sound triggers
   const prevIndexRef = useRef(-1);
   const blipCounterRef = useRef(0);
@@ -218,11 +248,11 @@ export default function GameStage() {
   const currentLine = lines[index] || null;
 
   // The custom hook handles the typing effect
-  const { displayedText, isComplete, skip } = useTypewriter(live ? currentLine?.text || "" : "", 12);
+  const { displayedText, isComplete, skip } = useTypewriter(playing ? currentLine?.text || "" : "", 12);
 
   // Trigger sounds when a new dialogue line starts
   useEffect(() => {
-    if (!live || !currentLine || prevIndexRef.current === index) return;
+    if (!playing || !currentLine || prevIndexRef.current === index) return;
     prevIndexRef.current = index;
 
     // Reset blip counter on new line
@@ -243,17 +273,17 @@ export default function GameStage() {
     if (currentLine.emotion === "point" && lines[index - 1]?.emotion !== "point") {
       audioRef.current?.deskSlam();
     }
-  }, [live, index, currentLine, lines]);
+  }, [playing, index, currentLine, lines]);
 
   // Typewriter blip, throttled to one per AUDIO.blipEvery characters
   useEffect(() => {
-    if (!live || !currentLine || displayedText.length === 0 || isComplete) return;
+    if (!playing || !currentLine || displayedText.length === 0 || isComplete) return;
 
     blipCounterRef.current++;
     if (blipCounterRef.current % AUDIO.blipEvery === 0) {
       audioRef.current?.blip();
     }
-  }, [live, displayedText, currentLine, isComplete]);
+  }, [playing, displayedText, currentLine, isComplete]);
 
   // Speaker-change choreography. Same speaker twice in a row is not a
   // transition at all -- the sprite just swaps emotion in place.
@@ -319,7 +349,7 @@ export default function GameStage() {
   // EVIDENCE_MS, paused while hovered or focused, or on the next advance.
   const [evidence, setEvidence] = useState<(typeof courtRecord)[number] | null>(null);
   const [evidenceHeld, setEvidenceHeld] = useState(false);
-  const caseStarted = live && !inIntro && !ended && index === 0;
+  const caseStarted = playing && !inIntro && !ended && index === 0;
   useEffect(() => {
     setEvidence(caseStarted ? EVIDENCE.get(selectedTopic) ?? null : null);
     setEvidenceHeld(false);
@@ -367,6 +397,7 @@ export default function GameStage() {
   };
 
   const handleNext = () => {
+    if (titleUp) return dismissTitle();
     if (!live || ended || !currentLine) return;
     setEvidence(null); // advancing dismisses the evidence card
 
@@ -428,13 +459,31 @@ export default function GameStage() {
           thinking={false}
           muted={muted}
           musicOn={musicOn}
-          typing={live && !ended && !isComplete}
+          typing={playing && !ended && !isComplete}
           onReady={onAudioReady}
         />
       )}
 
       {/* 1. CRT SCANLINE EFFECT (Overlay) */}
       <div className="absolute inset-0 z-50 pointer-events-none opacity-10 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))]" style={{ backgroundSize: "100% 2px, 3px 100%" }} />
+
+      {titleUp && (
+        <button
+          type="button"
+          ref={titleRef}
+          onClick={dismissTitle}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowRight") { e.preventDefault(); dismissTitle(); }
+          }}
+          data-testid="title-card"
+          className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-6 bg-black px-6 text-center focus-visible:outline-none"
+        >
+          <span className="font-serif text-[clamp(2rem,7vw,4.5rem)] leading-[1.05] text-white">
+            {verdicts[selectedTopic]?.title}
+          </span>
+          <span className="font-mono text-[10px] sm:text-xs tracking-widest text-gray-400">[ PRESS TO CONTINUE ]</span>
+        </button>
+      )}
 
       {/* A missing background is loud, not a silent black stage. */}
       {missingBackground && (
@@ -494,7 +543,7 @@ export default function GameStage() {
         <h1 className="sr-only">Courtroom: {selectedTopic}</h1>
         {/* Screen readers get each whole line once, not the typewriter's letters. */}
         <p className="sr-only" aria-live="polite">
-          {live && !ended ? `${currentLine.speaker}: ${currentLine.text}` : ""}
+          {titleUp ? verdicts[selectedTopic]?.title : playing && !ended ? `${currentLine.speaker}: ${currentLine.text}` : ""}
         </p>
 
         {!begun && (
@@ -714,8 +763,8 @@ export default function GameStage() {
           className="block w-full text-left bg-black/95 border-4 border-white relative cursor-pointer hover:border-green-400 transition-colors shadow-[8px_8px_0px_0px_rgba(0,0,0,0.5)] focus-visible:outline-none focus-visible:border-green-300 focus-visible:ring-4 focus-visible:ring-green-300/70"
         >
           {/* Speaker nameplate, flush into the top-left corner of the box */}
-          <span aria-hidden className="absolute top-0 left-0 bg-blue-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm font-bold capitalize tracking-wider border-r-2 border-b-2 border-white z-10">
-            {staged.speaker}
+          <span aria-hidden data-testid="nameplate" className="absolute top-0 left-0 bg-blue-600 text-white px-2 sm:px-3 py-1 text-xs sm:text-sm font-bold capitalize tracking-wider border-r-2 border-b-2 border-white z-10">
+            {staged.speaker === "narrator" ? "NARRATOR" : staged.speaker}
           </span>
 
           {/* Fixed height, sized for the longest line in the data at each breakpoint. */}

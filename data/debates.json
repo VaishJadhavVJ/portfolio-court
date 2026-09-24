@@ -670,5 +670,117 @@
       "emotion": "amazed",
       "text": "HOLD IT!! If 'purpose plus passion equals power,' then why are we even analyzing portfolios? Shouldn't we just build things because they EXIST?!"
     }
+  ],
+  "Portfolio Court": [
+    {
+      "id": 1,
+      "speaker": "baka",
+      "emotion": "happy",
+      "text": "OBJECTION!! Portfolio Court SHIPPED with Next.js, TypeScript, and Tailwind CSS! It turns my portfolio into a courtroom where I debate myself!"
+    },
+    {
+      "id": 2,
+      "speaker": "ice",
+      "emotion": "neutral",
+      "text": "An interesting metaphor... But does it scale to the complexity of your other projects? The courtroom format seems limiting for your multidisciplinary achievements."
+    },
+    {
+      "id": 3,
+      "speaker": "child",
+      "emotion": "confused",
+      "text": "HOLD IT!! Why do we need courtroom metaphors for portfolios? Isn't this just glorified self-criticism with extra steps?"
+    },
+    {
+      "id": 4,
+      "speaker": "baka",
+      "emotion": "shocked",
+      "text": "OBJECTION!! The courtroom format isn't limiting - it's POWERFUL! It forces confrontation with my own work, making every project a BATTLE to be won!"
+    },
+    {
+      "id": 5,
+      "speaker": "ice",
+      "emotion": "neutral",
+      "text": "The courtroom metaphor... clever. But it risks reducing complex work to adversarial battles. Portfolio Court's true value lies in structured self-reflection, not confrontation."
+    },
+    {
+      "id": 6,
+      "speaker": "child",
+      "emotion": "confused",
+      "text": "Wait... is Portfolio Court actually about self-reflection or just glorified arguments with myself? Which one is it?"
+    },
+    {
+      "id": 7,
+      "speaker": "baka",
+      "emotion": "happy",
+      "text": "Portfolio Court SHIPPED as a complete system - it's not just reflection, it's a living debate that makes my portfolio IMPOSSIBLE to ignore!"
+    },
+    {
+      "id": 8,
+      "speaker": "ice",
+      "emotion": "smug",
+      "text": "The courtroom metaphor... brilliant. It transforms passive presentation into active engagement, making each project a testament to intellectual rigor rather than mere technical achievement."
+    },
+    {
+      "id": 9,
+      "speaker": "child",
+      "emotion": "confused",
+      "text": "But why do we need agents to debate projects? Isn't that just... talking to yourself with extra steps?"
+    }
+  ],
+  "AI Police": [
+    {
+      "id": 1,
+      "speaker": "baka",
+      "emotion": "happy",
+      "text": "AI POLICE SHIPPED WITH DOCKER ISOLATION AND HIDDEN-TEST GRADING! 25 RECORDED RUNS PROVE CODING AGENTS REPORT ACCURATELY!"
+    },
+    {
+      "id": 2,
+      "speaker": "ice",
+      "emotion": "neutral",
+      "text": "Impressive validation... but the real question is whether they'll maintain this accuracy under adversarial conditions..."
+    },
+    {
+      "id": 3,
+      "speaker": "child",
+      "emotion": "confused",
+      "text": "HOLD IT!! If accuracy is already proven, why test it again? Is this about validation or validation of validation?"
+    },
+    {
+      "id": 4,
+      "speaker": "baka",
+      "emotion": "nervous",
+      "text": "W-WHAT DO YOU MEAN ADVERSARIAL CONDITIONS?! MY SYSTEM WORKS PERFECTLY AS-IS!"
+    },
+    {
+      "id": 5,
+      "speaker": "ice",
+      "emotion": "neutral",
+      "text": "Contrarian raises a valid philosophical question... though the adversarial conditions I mentioned would actually test the robustness of the validation itself, not the initial results."
+    },
+    {
+      "id": 6,
+      "speaker": "child",
+      "emotion": "confused",
+      "text": "Wait, are we testing the AI or the testing system itself? Which one is actually on trial here?"
+    },
+    {
+      "id": 7,
+      "speaker": "baka",
+      "emotion": "point",
+      "text": "AI POLICE ISN'T ABOUT PHILOSOPHY - IT'S ABOUT SHIPPED PROOF! WE TESTED WHAT WORKS AND IT WORKS!"
+    },
+    {
+      "id": 8,
+      "speaker": "ice",
+      "emotion": "smug",
+      "text": "Both questions miss the strategic point... AI Police establishes a precedent for verifiable AI work in high-stakes environments. The real test begins now."
+    },
+    {
+      "id": 9,
+      "speaker": "child",
+      "emotion": "amazed",
+      "text": "HOLD IT!! If we're testing AI, why not test the testers? Who watches the watchers of AI? Meta-validation inception!"
+    }
   ]
 }

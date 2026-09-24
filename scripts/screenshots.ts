@@ -11,6 +11,18 @@ import { chromium, type ConsoleMessage, type Request } from 'playwright';
 import * as fs from 'fs';
 import debatesRaw from '../data/debates.json';
 import courtRecord from '../data/court-record.json';
+import verdictsRaw from '../data/verdicts.json';
+
+const verdicts = verdictsRaw as Record<string, { title: string; verdict: string }>;
+
+/** Title card, verdict line and end card, in that order, or what went wrong. */
+function caseShape(r: { topic: string; ok: boolean; titleCard?: string | null; verdict?: boolean }): string | null {
+  const want = verdicts[r.topic]?.title;
+  if (!want) return 'has no entry in data/verdicts.json';
+  if (r.titleCard !== want) return `title card was ${JSON.stringify(r.titleCard)}, expected ${JSON.stringify(want)}`;
+  if (r.ok && !r.verdict) return 'last line was not the narrator verdict';
+  return null;
+}
 import { playDebate, playIntro } from './play-debate';
 
 const BASE = process.argv[2] ?? 'http://localhost:3000';
@@ -26,10 +38,10 @@ const PAGES = [
   { path: '/court', name: 'court', fullscreen: true },
 ];
 
-const allTexts = Object.values(debatesRaw as Record<string, { text: string }[]>)
-  .flat()
-  .map((l) => l.text)
-  .filter((t) => t.trim());
+const allTexts = [
+  ...Object.values(debatesRaw as Record<string, { text: string }[]>).flat().map((l) => l.text),
+  ...Object.values(verdictsRaw as Record<string, { verdict: string }>).map((v) => v.verdict),
+].filter((t) => t.trim());
 
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
@@ -91,7 +103,9 @@ async function main() {
         let first = true;
         for (const topic of sample) {
           const r = await playDebate(p, topic);
-          if (r.ok) ended++;
+          const shape = caseShape(r);
+          if (shape) problems.push(`${page.name}@${vp.label}: "${topic}" ${shape}`);
+          if (r.ok && !shape) ended++;
           const ev = r.evidence;
           const wantEvidence = courtRecord.some((c) => c.title === topic);
           if (wantEvidence && !ev?.shown) problems.push(`${page.name}@${vp.label}: "${topic}" showed no evidence card`);
@@ -106,7 +120,7 @@ async function main() {
           first = false;
           if (!r.ok) problems.push(`${page.name}@${vp.label}: "${r.topic}" ${r.problem}`);
         }
-        note += `  ${ended}/${sample.length} debates reached the end card, ${evidenceShown} evidence cards`;
+        note += `  ${ended}/${sample.length} cases: title card, verdict, end card | ${evidenceShown} evidence cards`;
 
         // The end card's REPLAY INTRO must bring the intro back and hand over again.
         if (await p.isVisible('[data-testid="end-replay-intro"]')) {
@@ -123,6 +137,10 @@ async function main() {
         const begin = await p.waitForSelector('[data-testid="begin"]', { timeout: 5000 }).catch(() => null);
         if (begin) await begin.click();
         else problems.push(`${page.name}@${vp.label}: no begin screen`);
+        // Returning visit opens straight on the case's title card; clear it.
+        const card = await p.waitForSelector('[data-testid="title-card"]', { timeout: 4000 }).catch(() => null);
+        if (card) await card.click();
+        else problems.push(`${page.name}@${vp.label}: returning visit showed no title card`);
         // Returning visitor (the intro flag is now saved): straight to the debate.
         await p.waitForTimeout(1600);
         if (await p.isVisible('[data-testid="skip-intro"]')) problems.push(`${page.name}@${vp.label}: intro replayed for a returning visitor`);
@@ -243,6 +261,8 @@ async function main() {
       await p.click(`[data-testid="take-to-court"] >> nth=${i}`);
       await p.waitForURL(/\/court\?topic=/);
       const r = await playDebate(p);
+      const shape = caseShape(r);
+      if (shape) problems.push(`${where}: ${links[i].href} ${shape}`);
       if (r.topic !== links[i].title) problems.push(`${where}: ${links[i].href} opened "${r.topic}", expected "${links[i].title}"`);
       else if (!r.ok) problems.push(`${where}: ${links[i].href} ${r.problem}`);
       else played++;

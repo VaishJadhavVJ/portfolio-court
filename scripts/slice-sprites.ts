@@ -27,7 +27,7 @@ const SHEETS: { file: string; names: string[] }[] = [
 ];
 
 /** Panels that are sliced (they shape the shared crop) but not written: unused by the site. */
-const NOT_DEPLOYED = new Set(['child-sleep', 'ice-angry', 'narrator-idle', 'narrator-point']);
+const NOT_DEPLOYED = new Set(['child-sleep', 'ice-angry']);
 /** ~500px tall is the largest the stage renders a sprite. */
 const OUT_HEIGHT = 500;
 

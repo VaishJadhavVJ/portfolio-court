@@ -22,8 +22,7 @@ const SPRITE: Record<AgentName, Partial<Record<Emotion, string>> & { default: st
              point: "smug", nervous: "neutral", happy: "smug", default: "neutral" },
     child: { confused: "confused", amazed: "amazed", annoyed: "annoyed",
              point: "confused", nervous: "confused", happy: "amazed", default: "confused" },
-    // Not wired to any agent, and its art is no longer in public/ (source in
-    // art/sheets). Kept only because AgentName still includes it.
+    // Speaks only the verdict at the end of each case (data/verdicts.json).
     narrator: { idle: "idle", point: "point", default: "idle" },
 };
 

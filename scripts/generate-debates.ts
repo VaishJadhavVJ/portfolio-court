@@ -14,7 +14,12 @@ function checkpoint(debates: Record<string, DialogueLine[]>): void {
   fs.writeFileSync(PARTIAL, JSON.stringify(debates, null, 2));
 }
 
+const DEBATES = 'data/debates.json';
+
 async function main() {
+  // --missing-only: generate debates only for published projects that have
+  // none. Existing debates are never regenerated or rewritten.
+  const missingOnly = process.argv.includes('--missing-only');
   console.log('Fetching portfolio data from Notion...');
   const [projects, work, skills, coursework] = await Promise.all([
     getProjects(), getWorkExperience(), getSkills(), getCoursework()
@@ -22,6 +27,33 @@ async function main() {
   console.log(`Loaded ${projects.length} projects, ${work.length} work, ${skills.length} skills, ${coursework.length} coursework.`);
 
   const portfolioData = { projects, work, skills, coursework };
+
+  if (missingOnly) {
+    const onDisk = fs.readFileSync(DEBATES, 'utf8');
+    const existing = JSON.parse(onDisk) as Record<string, DialogueLine[]>;
+    const missing = projects.filter((p) => !(p.title in existing));
+    if (!missing.length) {
+      console.log('Every published project already has a debate. Nothing generated.');
+      return;
+    }
+    console.log(`Missing debates: ${missing.map((p) => p.title).join(', ')}`);
+    const added: Record<string, DialogueLine[]> = {};
+    for (const project of missing) {
+      console.log(`Generating debate for: ${project.title}`);
+      added[project.title] = await runDebate(project.title, portfolioData);
+      checkpoint(added);
+    }
+    assertPlayable(added);
+    const merged = { ...existing, ...added };
+    // The existing debates must come through byte-for-byte unchanged.
+    for (const k of Object.keys(existing)) {
+      if (JSON.stringify(merged[k]) !== JSON.stringify(existing[k])) throw new Error(`refusing to write: "${k}" would change`);
+    }
+    fs.writeFileSync(DEBATES, JSON.stringify(merged, null, 2));
+    fs.rmSync(PARTIAL, { force: true });
+    console.log(`Added ${missing.length} debate(s); ${Object.keys(existing).length} existing debates untouched.`);
+    return;
+  }
 
   const debates: Record<string, DialogueLine[]> = {};
 

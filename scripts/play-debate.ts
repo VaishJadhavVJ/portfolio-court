@@ -17,6 +17,10 @@ export interface PlayResult {
   introLines: number;
   /** Evidence card: shown at case start, clear of the dialogue box, gone after the first press. */
   evidence?: { shown: boolean; overlapsDialogue: boolean; dismissedOnAdvance: boolean };
+  /** Text of the case's title card, or null if none appeared. */
+  titleCard?: string | null;
+  /** The last line was the narrator's verdict (NARRATOR nameplate). */
+  verdict?: boolean;
 }
 
 const BEGIN = '[data-testid="begin"]';
@@ -24,6 +28,7 @@ const BOX = '[data-testid="dialogue-box"]';
 const END = '[data-testid="end-card"]';
 const SKIP = '[data-testid="skip-intro"]';
 const EVIDENCE = '[data-testid="evidence-card"]';
+const TITLE = '[data-testid="title-card"]';
 
 /** Clicks through the intro until it hands over to the debate. Returns lines seen, or -1 if it never ends. */
 export async function playIntro(page: Page): Promise<number> {
@@ -65,6 +70,15 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
 
   const selected = topic ?? (await page.inputValue('select'));
 
+  // Each case opens on its title card; one press dismisses it.
+  const titleEl = await page.waitForSelector(TITLE, { timeout: 4000 }).catch(() => null);
+  const titleCard = titleEl ? ((await page.textContent(`${TITLE} span`)) ?? '').trim() : null;
+  if (titleEl) {
+    await page.click(TITLE);
+    await page.waitForSelector(TITLE, { state: 'detached', timeout: 2000 }).catch(() => null);
+  }
+  let verdict = false;
+
   const card = await page.waitForSelector(EVIDENCE, { timeout: 2000 }).catch(() => null);
   let evidence: PlayResult['evidence'] = { shown: false, overlapsDialogue: false, dismissedOnAdvance: false };
   if (card) {
@@ -79,7 +93,7 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
   const start = await read();
   let index = start.index;
   const total = start.total;
-  const fail = (problem: string): PlayResult => ({ topic: selected, reached: index, total, ok: false, problem, introLines, evidence });
+  const fail = (problem: string): PlayResult => ({ topic: selected, reached: index, total, ok: false, problem, introLines, evidence, titleCard, verdict });
 
   // Target total + 1 is the end card. Each step may need two clicks: one to
   // skip the typewriter, one to advance.
@@ -100,6 +114,12 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
       if (now.index >= target) {
         index = now.index;
         advanced = true;
+        // The final line is the verdict; the nameplate follows the speaker change.
+        if (target === total) {
+          verdict = await page
+            .waitForFunction(() => document.querySelector('[data-testid="nameplate"]')?.textContent?.trim() === 'NARRATOR', null, { timeout: 2000 })
+            .then(() => true, () => false);
+        }
       }
     }
     if (!advanced) return fail(target > total ? `no end card after line ${total}` : `stuck at line ${index}/${total}`);
@@ -110,5 +130,5 @@ export async function playDebate(page: Page, topic?: string): Promise<PlayResult
   await page.waitForTimeout(150);
   if ((await read()).index !== total) return fail('advanced past the end card');
 
-  return { topic: selected, reached: index, total, ok: true, introLines, evidence };
+  return { topic: selected, reached: index, total, ok: true, introLines, evidence, titleCard, verdict };
 }

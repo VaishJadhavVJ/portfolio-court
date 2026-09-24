@@ -1,0 +1,86 @@
+{
+  "Guardrailed Causal Discovery for Alzheimer's Biomarkers": {
+    "title": "The Contrarian Wants to Question Reality Itself",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins, exposing the philosophical paradox at the heart of causal inference with devastating elegance.",
+    "emotion": "point"
+  },
+  "Kindred": {
+    "title": "The Contrarian Wants to Question Meta-Networking",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins, exposing the infinite regress of self-referential networking with a single, devastating meta-question.",
+    "emotion": "point"
+  },
+  "Moral Machine: LLM vs Human Ethical Benchmarking": {
+    "title": "The Contrarian Wants to Question Ethics Benchmarking",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins, having dismantled the entire premise of ethical comparison with relentless skepticism.",
+    "emotion": "point"
+  },
+  "Delulify": {
+    "title": "The Builder Wants to Make Debugging Human-Friendly",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins by exposing the emotional bandaid as a distraction from fixing root causes. The Builder's passion remains unfocused.",
+    "emotion": "point"
+  },
+  "UrbanScale": {
+    "title": "The Builder Wants to Deploy Real-World Logistics",
+    "winner": "Builder",
+    "verdict": "Today's battle result: the Builder prevails, as their concrete achievements outshine the Strategist's validation and the Contrarian's skepticism.",
+    "emotion": "point"
+  },
+  "LoopBack": {
+    "title": "The Contrarian Wants to Check Existing Systems",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins, exposing the Builder's premature triumph and the Strategist's strategic blindness to fundamental research failures.",
+    "emotion": "point"
+  },
+  "Pillar": {
+    "title": "The Contrarian Wants to Question Transparency",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins, exposing the fundamental paradox of transparency as both liberation and control. The Builder's revolution has been reduced to a philosophical quandary.",
+    "emotion": "point"
+  },
+  "EdgeRecall": {
+    "title": "The Contrarian Wants to Question the Cruise Ship",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins, having exposed the fundamental contradiction in EdgeRecall's architecture with relentless precision.",
+    "emotion": "point"
+  },
+  "Entropy-Based Selective Step Verification": {
+    "title": "The Contrarian Wants to Prevent Uncertainty Altogether",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: The Contrarian wins, exposing the Builder's reactive approach as fundamentally flawed by questioning why verify when prevention is possible?",
+    "emotion": "point"
+  },
+  "Pathfinding Algorithm Visualizer": {
+    "title": "The Builder Wants to Demonstrate Graph Traversal",
+    "winner": "Builder",
+    "verdict": "Today's battle result: the Builder wins, having successfully established the pathfinding visualizer as the unshakable foundation of all future endeavors.",
+    "emotion": "point"
+  },
+  "Redacted Lore": {
+    "title": "The Strategist Wants to Control Narrative Distribution",
+    "winner": "Strategist",
+    "verdict": "Today's battle result: the Strategist wins, reframing the entire argument as a strategic positioning rather than technical merit or philosophical questioning.",
+    "emotion": "point"
+  },
+  "Portfolio Review": {
+    "title": "The Contrarian Wants to Build Things Because They Exist",
+    "winner": "Contrarian",
+    "verdict": "Today's battle result: the Contrarian wins, exposing the absurdity of overanalyzing portfolios when the simple joy of creation is all that truly matters.",
+    "emotion": "point"
+  },
+  "Portfolio Court": {
+    "title": "The Builder Wants to Debate My Projects",
+    "winner": "Strategist",
+    "verdict": "Today's battle result: The Strategist wins, having reframed the courtroom metaphor from confrontation to structured self-reflection.",
+    "emotion": "idle"
+  },
+  "AI Police": {
+    "title": "The Strategist Wants to Test The Testing System",
+    "winner": "Strategist",
+    "verdict": "Today's battle result: the Strategist wins by reframing the debate from immediate validation to long-term strategic implications of AI verification.",
+    "emotion": "point"
+  }
+}
