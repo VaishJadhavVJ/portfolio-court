@@ -7,7 +7,7 @@
  * warning,
  * error, page-level scrolling, or dialogue text overflowing its fixed box.
  */
-import { chromium, type ConsoleMessage, type Request } from 'playwright';
+import { chromium, type ConsoleMessage, type Request, type Page } from 'playwright';
 import * as fs from 'fs';
 import debatesRaw from '../data/debates.json';
 import courtRecord from '../data/court-record.json';
@@ -36,7 +36,97 @@ const PAGES = [
   // fullscreen pages must not scroll; the landing page is long content and should.
   { path: '/', name: 'home', fullscreen: false },
   { path: '/court', name: 'court', fullscreen: true },
+  { path: '/readings', name: 'readings', fullscreen: false },
 ];
+const NAV_WIDTHS = [320, 390, 768, 1440];
+const LINE = 32; // pleading paper baseline grid
+
+/** Navbar: three zones, logo dead centre, nothing overlapping or off-screen. */
+async function checkNav(p: Page, where: string, problems: string[]) {
+  // A string, not a function: tsx wraps named helpers in __name(), which does not exist in the page.
+  const r = (await p.evaluate(`(() => {
+    const box = (el) => (el ? el.getBoundingClientRect() : null);
+    const visible = (el) => { if (!el) return false; const b = el.getBoundingClientRect(); return b.width > 0 && b.height > 0 && getComputedStyle(el).visibility !== 'hidden'; };
+    const zone = (id) => {
+      const kids = [...document.querySelectorAll('[data-testid="' + id + '"] > *')].flatMap((k) => (getComputedStyle(k).display === 'contents' ? [...k.children] : [k]));
+      const rects = kids.filter(visible).map((k) => k.getBoundingClientRect());
+      if (!rects.length) return null;
+      return { left: Math.min(...rects.map((b) => b.left)), right: Math.max(...rects.map((b) => b.right)) };
+    };
+    const logo = box(document.querySelector('[data-testid="nav-logo"]'));
+    const vw = document.documentElement.clientWidth;
+    const all = [...document.querySelectorAll('[data-testid="site-nav"] a, [data-testid="site-nav"] button')].filter(visible).map((e) => e.getBoundingClientRect());
+    return {
+      vw, left: zone('nav-left'), right: zone('nav-right'), logo: logo && { left: logo.left, right: logo.right },
+      offscreen: all.filter((b) => b.left < -0.5 || b.right > vw + 0.5).length,
+      menuButton: visible(document.querySelector('[data-testid="nav-menu-button"]')),
+      sectionLinks: [...document.querySelectorAll('[data-testid="nav-left"] ul a')].filter(visible).length,
+      icons: [...document.querySelectorAll('[data-testid="nav-right"] ul a')].filter(visible).map((a) => a.getAttribute('aria-label')),
+    };
+  })()`)) as {
+    vw: number;
+    left: { left: number; right: number } | null;
+    right: { left: number; right: number } | null;
+    logo: { left: number; right: number } | null;
+    offscreen: number;
+    menuButton: boolean;
+    sectionLinks: number;
+    icons: (string | null)[];
+  };
+  if (!r.logo || !r.left || !r.right) return problems.push(`${where}: navbar zones missing`);
+  const centre = (r.logo.left + r.logo.right) / 2;
+  if (Math.abs(centre - r.vw / 2) > 1) problems.push(`${where}: logo centre ${centre.toFixed(1)} vs viewport centre ${r.vw / 2}`);
+  if (r.left.right > r.logo.left) problems.push(`${where}: left zone overlaps the logo by ${(r.left.right - r.logo.left).toFixed(1)}px`);
+  if (r.logo.right > r.right.left) problems.push(`${where}: right zone overlaps the logo by ${(r.logo.right - r.right.left).toFixed(1)}px`);
+  if (r.offscreen) problems.push(`${where}: ${r.offscreen} navbar control(s) off-screen`);
+  if (!r.menuButton && (r.sectionLinks !== 4 || r.icons.some((l) => !l))) problems.push(`${where}: desktop nav shows ${r.sectionLinks} section links, icons ${JSON.stringify(r.icons)}`);
+  if (r.menuButton) {
+    // Keyboard: open with Enter, Tab into the panel, Escape closes and returns focus.
+    await p.focus('[data-testid="nav-menu-button"]');
+    await p.keyboard.press('Enter');
+    const opened = await p.isVisible('[data-testid="nav-menu"]');
+    await p.keyboard.press('Tab');
+    const inside = await p.evaluate(() => !!document.activeElement?.closest('#site-menu'));
+    const menuOff = await p.evaluate(() => [...document.querySelectorAll('#site-menu a')].filter((a) => { const b = a.getBoundingClientRect(); return b.right > document.documentElement.clientWidth + 0.5 || b.left < -0.5; }).length);
+    await p.keyboard.press('Escape');
+    const closed = !(await p.isVisible('[data-testid="nav-menu"]'));
+    const back = await p.evaluate(() => document.activeElement?.getAttribute('data-testid'));
+    if (!opened || !inside || !closed || back !== 'nav-menu-button' || menuOff) {
+      problems.push(`${where}: dropdown keyboard (open ${opened}, tab inside ${inside}, escape closes ${closed}, focus back ${back}, off-screen items ${menuOff})`);
+    }
+  }
+  return null;
+}
+
+/** Pleading paper: every line and gap on the 32px grid, margin numbers aligned (hidden on phones). */
+async function checkPleading(p: Page, where: string, problems: string[]) {
+  const r = await p.evaluate((L) => {
+    const art = document.querySelector('[data-testid="pleading"]');
+    if (!art) return { missing: true, off: [] as string[], numbers: '', vw: 0 };
+    const top = art.getBoundingClientRect().top;
+    const off: string[] = [];
+    for (const el of art.querySelectorAll('p, h1, h2, h3, li, pre, blockquote, nav')) {
+      const b = el.getBoundingClientRect();
+      const dt = (b.top - top) % L, dh = b.height % L;
+      if (Math.min(dt, L - dt) > 0.5 || Math.min(dh, L - dh) > 0.5) off.push(`${el.tagName.toLowerCase()} top+${(b.top - top).toFixed(1)} h${b.height.toFixed(1)}`);
+    }
+    const nums = art.querySelector('[data-testid="line-numbers"]');
+    const shown = nums && getComputedStyle(nums).display !== 'none';
+    let numbers = shown ? 'shown' : 'hidden';
+    if (shown) {
+      const spans = [...nums!.children].slice(0, 20);
+      const bad = spans.filter((sp, i) => Math.abs(sp.getBoundingClientRect().top - top - i * L) > 0.5).length;
+      if (bad) numbers += ` (${bad} misaligned)`;
+      if (nums!.getAttribute('aria-hidden') !== 'true') numbers += ' (not aria-hidden)';
+    }
+    return { missing: false, off, numbers, vw: document.documentElement.clientWidth };
+  }, LINE);
+  if (r.missing) return problems.push(`${where}: no pleading paper`);
+  if (r.off.length) problems.push(`${where}: ${r.off.length} element(s) off the 32px grid: ${r.off.slice(0, 4).join('; ')}`);
+  if (r.numbers.includes('misaligned') || r.numbers.includes('not aria-hidden')) problems.push(`${where}: line numbers ${r.numbers}`);
+  if (r.vw < 640 && r.numbers !== 'hidden') problems.push(`${where}: line numbers should be hidden on phones`);
+  return null;
+}
 
 const allTexts = [
   ...Object.values(debatesRaw as Record<string, { text: string }[]>).flat().map((l) => l.text),
@@ -225,6 +315,40 @@ async function main() {
     }
   }
 
+  // Navbar at 320/390/768/1440 on every site page, and every reading entry.
+  {
+    const probe = await browser.newPage();
+    await probe.goto(BASE + '/readings', { waitUntil: 'networkidle' });
+    const entryPaths = await probe.$$eval('[data-testid="entry-line"] a', (as) => as.map((a) => a.getAttribute('href') ?? ''));
+    const empty = await probe.isVisible('[data-testid="collection-empty"]');
+    await probe.close();
+    if (!entryPaths.length && !empty) problems.push('readings: no entries and no empty-state message');
+    const sitePaths = ['/', '/readings', ...entryPaths];
+    let checks = 0;
+    for (const w of NAV_WIDTHS) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: 800 } });
+      const p = await ctx.newPage();
+      p.on('console', (m: ConsoleMessage) => { if (m.type() === 'error' || m.type() === 'warning') problems.push(`nav@${w}: console ${m.type()}: ${m.text()}`); });
+      p.on('response', (r) => { if (r.status() >= 400) problems.push(`nav@${w}: ${r.status()} ${r.url()}`); });
+      for (const path of sitePaths) {
+        await p.goto(BASE + path, { waitUntil: 'load' });
+        await p.waitForTimeout(300);
+        const where = `${path}@${w}`;
+        await checkNav(p, where, problems);
+        const h = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        if (h > 0) problems.push(`${where}: page scrolls horizontally by ${h}px`);
+        if (path.startsWith('/readings/')) {
+          await checkPleading(p, where, problems);
+          if (w === 390) await p.screenshot({ path: `${OUT}/reading-entry-390.png`, fullPage: true });
+          if (w === 1440) await p.screenshot({ path: `${OUT}/reading-entry-1440.png`, fullPage: true });
+        }
+        checks++;
+      }
+      await ctx.close();
+    }
+    console.log(`nav+readings   ${checks} page checks at ${NAV_WIDTHS.join('/')} | ${entryPaths.length} reading entr${entryPaths.length === 1 ? 'y' : 'ies'}${empty ? ' (empty state shown)' : ''}`);
+  }
+
   // Doorways into the courtroom: title menu, deep links, "take it to court".
   {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -255,7 +379,12 @@ async function main() {
 
     // Every "take it to court" link, clicked from the landing page, lands on
     // its own case and plays to the end card.
-    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    // Not networkidle: the navbar's prefetches can hold a request open for ~30s.
+    const home = async () => {
+      await p.goto(BASE + '/', { waitUntil: 'load' });
+      await p.waitForSelector('[data-testid="take-to-court"]');
+    };
+    await home();
     const links = await p.$$eval('[data-testid="take-to-court"]', (as) =>
       as.map((a) => ({ href: a.getAttribute('href'), title: a.closest('li')?.querySelector('h3')?.textContent?.replace(/\s*↗\s*$/, '').trim() ?? '' }))
     );
@@ -265,7 +394,7 @@ async function main() {
     if (links.length !== expected.length) problems.push(`${where}: ${links.length} take-it-to-court links for ${expected.length} debated projects`);
     let played = 0;
     for (let i = 0; i < links.length; i++) {
-      if (i > 0) await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+      if (i > 0) await home();
       await p.click(`[data-testid="take-to-court"] >> nth=${i}`);
       await p.waitForURL(/\/court\?topic=/);
       const r = await playDebate(p);

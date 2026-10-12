@@ -3,14 +3,11 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { heroVariant } from "@/lib/chicago";
 import variants from "@/lib/hero-variants.json";
 
-const VIDEO = '[data-testid="hero-video"]';
-
 /**
  * The video is never downloaded on small screens or under reduced-motion: the
  * server renders the poster, and the <video> is only mounted on the client once
  * both conditions pass. A CSS-hidden <video> would still fetch its sources, so
- * the element genuinely must not exist. Shared with HeroVideoToggle so the
- * pause button exists exactly where the video does.
+ * the element genuinely must not exist.
  */
 function useHeroVideo() {
   const [useVideo, setUseVideo] = useState(false);
@@ -28,48 +25,6 @@ function useHeroVideo() {
     };
   }, []);
   return useVideo;
-}
-
-/**
- * Pause/play for the looping background video (WCAG 2.2.2). Lives in the hero
- * rather than beside the video: the video sits in a fixed layer under the page
- * content, where a button could not be clicked.
- */
-export function HeroVideoToggle() {
-  const useVideo = useHeroVideo();
-  const [paused, setPaused] = useState(false);
-
-  // Mirror the element's real state: autoplay can be refused (low-power mode).
-  useEffect(() => {
-    const v = document.querySelector<HTMLVideoElement>(VIDEO);
-    if (!v) return;
-    const sync = () => setPaused(v.paused);
-    sync();
-    v.addEventListener("play", sync);
-    v.addEventListener("pause", sync);
-    return () => {
-      v.removeEventListener("play", sync);
-      v.removeEventListener("pause", sync);
-    };
-  }, [useVideo]);
-
-  if (!useVideo) return null;
-  const toggle = () => {
-    const v = document.querySelector<HTMLVideoElement>(VIDEO);
-    if (!v) return;
-    if (v.paused) v.play().catch(() => {});
-    else v.pause();
-  };
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      data-testid="hero-video-toggle"
-      className="absolute bottom-4 right-4 rounded-full border border-white/60 bg-black/65 px-4 py-2 text-xs font-medium text-white transition-colors hover:border-white hover:bg-black/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white sm:right-6"
-    >
-      {paused ? "▶ play video" : "❚❚ pause video"}
-    </button>
-  );
 }
 
 // Season and day/night art. lib/hero-variants.json is written at build time by

@@ -13,6 +13,8 @@ const config: Config = {
         sans: ['var(--font-geist-sans)', 'Arial', 'sans-serif'],
         mono: ['var(--font-geist-mono)', 'Courier New', 'monospace'],
         serif: ['var(--font-instrument-serif)', 'Georgia', 'serif'],
+        // Readings pages: system Times, never self-hosted.
+        times: ['"Times New Roman"', 'Times', 'serif'],
       },
     },
   },

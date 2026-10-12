@@ -14,8 +14,9 @@ const PROJECTS_DB = "2df64b3b983f807b8befe4e1772cef91";
 const WORK_DB = "2df64b3b983f8081851ee9ac6dcf0527";
 const SKILLS_DB = "2df64b3b983f80c3bc7cf93017d0b5fc";
 const COURSEWORK_DB = "2df64b3b983f80699d3bd3889e951e03";
+const READINGS_DB = "99fa92ed25b043598c20e6c396401446";
 /** For read-only reporting scripts. */
-export const DATABASES = { Projects: PROJECTS_DB, Work: WORK_DB, Skills: SKILLS_DB, Coursework: COURSEWORK_DB };
+export const DATABASES = { Projects: PROJECTS_DB, Work: WORK_DB, Skills: SKILLS_DB, Coursework: COURSEWORK_DB, Readings: READINGS_DB };
 export { notion };
 
 export interface Project {
@@ -116,4 +117,109 @@ export async function getCoursework(): Promise<Coursework[]> {
     termYear: getMultiSelect(page.properties["Term / Year"]),
     description: getText(page.properties["Brief Description"]),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Daily Readings. The summary and thoughts live in rich-text properties, and
+// any page body is rendered after them. Formatting is kept run by run.
+// ---------------------------------------------------------------------------
+
+export interface RichRun {
+  text: string;
+  href: string | null;
+  bold: boolean;
+  italic: boolean;
+  strikethrough: boolean;
+  underline: boolean;
+  code: boolean;
+}
+
+type ApiRich = { plain_text: string; href: string | null; annotations: { bold: boolean; italic: boolean; strikethrough: boolean; underline: boolean; code: boolean } };
+const toRuns = (rich: ApiRich[]): RichRun[] =>
+  rich.map((r) => ({ text: r.plain_text, href: r.href, ...pick(r.annotations) }));
+const pick = (a: ApiRich["annotations"]) => ({ bold: a.bold, italic: a.italic, strikethrough: a.strikethrough, underline: a.underline, code: a.code });
+const getRich = (p: Prop): RichRun[] => (p?.type === "rich_text" ? toRuns(p.rich_text) : []);
+const getFullTitle = (p: Prop) => (p?.type === "title" ? p.title.map((t) => t.plain_text).join("").trim() : "");
+
+export interface Reading {
+  id: string;
+  created: string;
+  title: string;
+  date: string | null;
+  format: string | null;
+  author: string;
+  source: string | null;
+  understanding: RichRun[];
+  agreement: RichRun[];
+  questions: RichRun[];
+}
+
+/**
+ * Published readings only. Unlike the other databases this pages through the
+ * results: a daily log passes Notion's 100-row page within months. Zero rows
+ * is a real state here (nothing published yet), so it is not an error; a
+ * failed query still throws.
+ */
+export async function getReadings(): Promise<Reading[]> {
+  const pages: PageObjectResponse[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion().databases.query({
+      database_id: READINGS_DB,
+      filter: { property: "Published", checkbox: { equals: true } },
+      start_cursor: cursor,
+      page_size: 100,
+    });
+    pages.push(...res.results.filter(isFullPage));
+    cursor = res.has_more ? res.next_cursor ?? undefined : undefined;
+  } while (cursor);
+  return pages.map((page) => ({
+    id: page.id,
+    created: page.created_time,
+    title: getFullTitle(page.properties.Reading),
+    date: getDate(page.properties["Reflection Date"]),
+    format: getSelect(page.properties.Format),
+    author: getText(page.properties["Author / Publication"]),
+    source: getUrl(page.properties.Source),
+    understanding: getRich(page.properties["My Understanding"]),
+    agreement: getRich(page.properties["Agreement / Disagreement"]),
+    questions: getRich(page.properties.Questions),
+  }));
+}
+
+export type Block =
+  | { type: "paragraph" | "heading_1" | "heading_2" | "heading_3" | "quote" | "bulleted_list_item" | "numbered_list_item"; rich: RichRun[]; children: Block[] }
+  | { type: "code"; rich: RichRun[] }
+  | { type: "divider" };
+
+const TEXT_BLOCKS = ["paragraph", "heading_1", "heading_2", "heading_3", "quote", "bulleted_list_item", "numbered_list_item"] as const;
+
+/**
+ * A page body, recursively. A block type the renderer does not support throws
+ * rather than vanishing: silently dropping part of an entry is the failure
+ * this site is built to avoid.
+ */
+export async function getBlocks(pageId: string): Promise<Block[]> {
+  const out: Block[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await notion().blocks.children.list({ block_id: pageId, start_cursor: cursor, page_size: 100 });
+    for (const b of res.results) {
+      if (!("type" in b)) continue;
+      const type = b.type;
+      if ((TEXT_BLOCKS as readonly string[]).includes(type)) {
+        const data = (b as unknown as Record<string, { rich_text: ApiRich[] }>)[type];
+        const children = b.has_children ? await getBlocks(b.id) : [];
+        out.push({ type: type as (typeof TEXT_BLOCKS)[number], rich: toRuns(data.rich_text), children });
+      } else if (type === "code") {
+        out.push({ type: "code", rich: toRuns((b as unknown as { code: { rich_text: ApiRich[] } }).code.rich_text) });
+      } else if (type === "divider") {
+        out.push({ type: "divider" });
+      } else {
+        throw new Error(`Notion block type "${type}" (page ${pageId}) is not supported by the readings renderer`);
+      }
+    }
+    cursor = res.has_more ? res.next_cursor ?? undefined : undefined;
+  } while (cursor);
+  return out;
 }

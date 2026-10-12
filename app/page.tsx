@@ -2,10 +2,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getProjects, getWorkExperience, getSkills, getCoursework } from "@/lib/notion";
-import HeroMedia, { HeroVideoToggle } from "@/components/HeroMedia";
+import HeroMedia from "@/components/HeroMedia";
 import MusicCredit from "@/components/MusicCredit";
 import ChicagoClock from "@/components/ChicagoClock";
-import { MEDIUM_URL, SPOTIFY_PLAYLIST_URL } from "@/lib/site";
+import { MEDIUM_URL, SPOTIFY_PLAYLIST_URL, SOCIAL } from "@/lib/site";
+import SiteNav, { isMail } from "@/components/nav/SiteNav";
+import EntryLine from "@/components/collection/EntryLine";
+import { READINGS, getReadingEntries } from "@/lib/readings";
 import { slugify } from "@/lib/slug";
 import debates from "@/data/debates.json";
 
@@ -14,19 +17,10 @@ const DEBATED = new Set(Object.keys(debates));
 
 export const revalidate = 60; // Revalidate every 60 seconds (optional, but good for CMS)
 
-const NAV = [
-  { label: "The Record", href: "#work" },
-  { label: "Credentials", href: "#skills" },
-  { label: "Contact", href: "#contact" },
-];
-
-const LINKS = [
-  { label: "GitHub", href: "https://github.com/VaishJadhavVJ", display: "github.com/VaishJadhavVJ" },
-  { label: "LinkedIn", href: "https://linkedin.com/in/vaishnavipjadhav", display: "linkedin.com/in/vaishnavipjadhav" },
-  { label: "Email", href: "mailto:vaishnavipjadhav55@gmail.com", display: "vaishnavipjadhav55@gmail.com" },
-];
-// Footer only: hidden while its config value is empty.
-const FOOTER_LINKS = [...LINKS, ...(MEDIUM_URL ? [{ label: "Medium", href: MEDIUM_URL, display: MEDIUM_URL }] : [])];
+// Footer: GitHub, LinkedIn, X (once set) and Medium (once set) by name; the
+// email address is shown in full.
+const FOOTER_LINKS = [...SOCIAL.filter((l) => !isMail(l.href)), ...(MEDIUM_URL ? [{ label: "Medium", href: MEDIUM_URL, display: MEDIUM_URL }] : [])];
+const EMAIL = SOCIAL.find((l) => isMail(l.href))!;
 
 /** Spotify's embed URL for a playlist page. A malformed value fails the build rather than shipping a broken player. */
 function spotifyEmbed(url: string): string | null {
@@ -41,9 +35,8 @@ const ABOUT =
   "I'm Vaishnavi Jadhav, an MS Computer Science student at UIC graduating May 2027. I started out at IBM working on mainframe systems, then pivoted into AI/ML. I'm on a research and founder track now, building more than I take courses. Looking for somewhere innovative to work next.";
 
 /**
- * The darkening layer. Measured: #contact starts 577-607px above the document
- * bottom across viewports, so full black is reached at 640px to guarantee the
- * whole section sits on solid black. It is part of the scrolling document rather than pinned to
+ * The darkening layer. Full black is reached well above the footer, so the
+ * last sections sit on solid black. It is part of the scrolling document rather than pinned to
  * the viewport, so the scene (which IS pinned) reads through a different part of
  * the gradient as you scroll. No scroll listener, no layout reads, nothing for the
  * main thread to do -- the compositor handles it, which is what keeps it smooth on
@@ -114,12 +107,14 @@ export default async function Lobby() {
   // Fetch from Notion
   // Promise.all, not allSettled: any failure must fail the render so ISR keeps
   // serving the last good page rather than caching one with sections missing.
-  const [projects, workExperience, skills, coursework] = await Promise.all([
+  const [projects, workExperience, skills, coursework, readings] = await Promise.all([
     getProjects(),
     getWorkExperience(),
     getSkills(),
     getCoursework(),
+    getReadingEntries(),
   ]);
+  const latestReadings = [...readings].sort((a, b) => b.n - a.n).slice(0, 5);
 
   // Group skills by category
   const skillsByCategory: Record<string, typeof skills> = {};
@@ -145,47 +140,9 @@ export default async function Lobby() {
       {/* Scroll-coupled darkening (see OVERLAY) */}
       <div className="pointer-events-none absolute inset-0 z-[1]" style={{ background: OVERLAY }} />
 
-      {/* NAVBAR — light bar, black type, no blur */}
-      <header className="sticky top-0 z-50 border-b border-black/10 bg-[#f7f6f2]">
-        {/* Under 400px the links take a second row: on one row the CTA pushed
-            Contact out of view at 320px. */}
-        <nav className="mx-auto flex max-w-[900px] flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 min-[400px]:h-14 min-[400px]:flex-nowrap min-[400px]:py-0 sm:gap-5 sm:px-6">
-          <a href="#top" aria-label="Top" className="shrink-0">
-            <Image
-              src="/ui/ice-smug-32.png"
-              alt=""
-              width={32}
-              height={32}
-              unoptimized
-              priority
-              className="h-8 w-8"
-              style={{ imageRendering: "pixelated" }}
-            />
-          </a>
+      <SiteNav />
 
-          <ul className="order-last flex basis-full flex-wrap items-center gap-x-4 gap-y-1 py-1 font-mono min-[400px]:order-none min-[400px]:min-w-0 min-[400px]:flex-1 min-[400px]:basis-auto min-[400px]:gap-2.5 min-[400px]:py-0 text-[9px] uppercase tracking-[0.1em] text-black sm:gap-6 sm:text-[11px] sm:tracking-[0.18em]">
-            {NAV.map(n => (
-              <li key={n.href}>
-                <a
-                  href={n.href}
-                  className="whitespace-nowrap border-b border-transparent pb-0.5 transition-colors hover:border-black hover:text-black"
-                >
-                  {n.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-
-          <Link
-            href="/court"
-            className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-black px-2.5 py-1.5 font-medium text-[9px] text-white transition-colors hover:bg-[var(--accent)] sm:px-4 sm:text-xs"
-          >
-            my brain is at war →
-          </Link>
-        </nav>
-      </header>
-
-      {/* HERO — nothing tints this and nothing sits behind the type.
+            {/* HERO — nothing tints this and nothing sits behind the type.
           Plain white on the sky. */}
       <section id="top" className="relative z-10 h-[62vh] min-h-[380px] w-full sm:h-[70vh] sm:max-h-[660px]">
         <div className="relative mx-auto flex h-full max-w-[900px] flex-col justify-start px-4 pt-8 sm:px-6 sm:pt-12">
@@ -222,7 +179,6 @@ export default async function Lobby() {
             </a>
           </div>
         </div>
-        <HeroVideoToggle />
       </section>
 
       <main className="relative z-10 mx-auto max-w-[900px] px-4 pb-24 sm:px-6">
@@ -340,6 +296,26 @@ export default async function Lobby() {
           </Card>
         )}
 
+        {/* DAILY READINGS */}
+        <Card id="readings">
+          <SectionHead eyebrow="Discovery" title="Daily Readings" />
+          {latestReadings.length === 0 ? (
+            <p className="font-mono text-[13px] text-[var(--on-dark-muted)]" data-testid="readings-empty">{READINGS.emptyText}</p>
+          ) : (
+            <ul>
+              {latestReadings.map((e) => (
+                <EntryLine key={e.id} entry={e} basePath={READINGS.basePath} theme="dark" />
+              ))}
+            </ul>
+          )}
+          <Link
+            href={READINGS.basePath}
+            className="mt-6 inline-block font-mono text-[12px] tracking-[0.06em] text-[var(--on-dark-soft)] underline-offset-4 hover:underline"
+          >
+            {READINGS.allLabel} →
+          </Link>
+        </Card>
+
         {/* CASE HISTORY */}
         {coursework.length > 0 && (
           <Card id="coursework">
@@ -363,29 +339,6 @@ export default async function Lobby() {
           </Card>
         )}
 
-        {/* CLOSING ARGUMENT — sits on solid black by here */}
-        <Card id="contact">
-          <SectionHead eyebrow="Closing Argument" title="Contact" />
-          <ul className="divide-y divide-[var(--card-rule)] border-t border-[var(--card-rule)]">
-            {LINKS.map(link => (
-              <li key={link.label}>
-                <a
-                  href={link.href}
-                  target={link.href.startsWith("mailto:") ? undefined : "_blank"}
-                  rel="noreferrer"
-                  className="group grid grid-cols-[110px_1fr_auto] items-baseline gap-4 py-5 text-[var(--on-dark)] transition-colors hover:text-[var(--accent)]"
-                >
-                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--on-dark-muted)]">
-                    {link.label}
-                  </span>
-                  <span className="min-w-0 truncate text-[15px] sm:text-base">{link.display}</span>
-                  <span className="text-[var(--on-dark-muted)] transition-transform group-hover:translate-x-0.5">↗</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
       </main>
 
       {/* FOOTER — the meadow. Bright surface, dark type, deliberately the
@@ -403,16 +356,31 @@ export default async function Lobby() {
         />
         <div className="pointer-events-none absolute inset-0 bg-white/55" />
         <div className="relative mx-auto flex min-h-[300px] max-w-[900px] flex-col justify-between gap-8 px-4 py-10 sm:min-h-[340px] sm:px-6 sm:py-12">
-          <p className="font-serif text-[clamp(2rem,6vw,3.25rem)] leading-[1.02] tracking-[-0.02em] text-[#12200b]">
-            building for the bees
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-5">
+            <p className="font-serif text-[clamp(2rem,6vw,3.25rem)] leading-[1.02] tracking-[-0.02em] text-[#12200b]">
+              building for the bees
+            </p>
+            <Link
+              href="/court"
+              className="rounded-full bg-[#12200b] px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-black focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#12200b]"
+            >
+              my brain is at war →
+            </Link>
+          </div>
+          <a
+            href={EMAIL.href}
+            data-testid="footer-email"
+            className="-mb-2 self-start break-all border-b border-[#12200b]/45 pb-0.5 text-base font-semibold text-[#12200b] hover:border-[#12200b] sm:text-lg"
+          >
+            {EMAIL.display}
+          </a>
           <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
             <ul className="flex flex-wrap gap-x-6 gap-y-2">
               {FOOTER_LINKS.map(link => (
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    target={link.href.startsWith("mailto:") ? undefined : "_blank"}
+                    target="_blank"
                     rel="noreferrer"
                     className="border-b border-[#12200b]/45 pb-0.5 text-sm font-semibold text-[#12200b] transition-colors hover:border-[#12200b] sm:text-base"
                   >

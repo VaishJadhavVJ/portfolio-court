@@ -66,3 +66,12 @@ body {
   html { scroll-behavior: auto; }
   .rise { animation: none; }
 }
+/* Pleading paper (readings entries). Inline runs at another size (mono labels,
+   inline code, links) inherit the 32px line height and, sitting on the same
+   baseline, stretch the line box past 32px: the source line measured 35px and
+   knocked everything below it off the grid. At line-height 1 they fit inside
+   the paragraph's own 32px line. Grid and flex children are not inline, so
+   they keep their 32px rows. */
+.pleading :is(p, li, h1, h2, h3, blockquote) :is(span, a, code, strong, em, s, u, time) {
+  line-height: 1;
+}
